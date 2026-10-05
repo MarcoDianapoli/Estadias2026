@@ -1,0 +1,7 @@
+{
+  "deviceId": "PC-01",
+  "assetCode": "SGL-0001",
+  "apiUrl": "http://localhost:3001",
+  "intervalMs": 5000,
+  "_nota": "Copia este archivo como agent.config.json y cambia assetCode por el código SGL que tiene el equipo en el inventario."
+}
