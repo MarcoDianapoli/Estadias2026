@@ -317,7 +317,8 @@ td strong { font-size: 13px; }
 .btn.secondary { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
 .btn.secondary:hover { background: #e2e8f0; }
 .btn:disabled { opacity: .6; cursor: not-allowed; }
-.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.header > .detail-btn { margin-left: auto; }
 
 .alerts.ok { background: #ecfdf5; border-color: #22c55e; color: #166534; }
 .code-badge { color: #1d4ed8; font-family: ui-monospace, Consolas, monospace; }

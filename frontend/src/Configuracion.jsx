@@ -72,10 +72,6 @@ export default function Configuracion() {
 
   return (
     <main className="app configuracion-page">
-      <header className="header">
-        <h1>Configuración</h1>
-      </header>
-
       <div className="config-layout">
         <section id="cuenta" className="panel config-panel" aria-labelledby="config-cuenta-title">
           <div className="panel-title">

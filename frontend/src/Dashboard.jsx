@@ -125,10 +125,6 @@ export default function Dashboard() {
 
   return (
     <div className="app dashboard-page">
-      <header className="header">
-        <h1>Panel general</h1>
-      </header>
-
       <section className="panel">
         <div className="panel-title"><h2>Accesos rápidos</h2></div>
         <div className="quick-grid">

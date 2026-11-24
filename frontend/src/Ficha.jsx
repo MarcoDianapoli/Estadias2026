@@ -144,7 +144,6 @@ export default function Ficha({ token: tokenProp }) {
     return (
       <main className="app ficha-page">
         <section className="panel ficha">
-          <h1>Ficha del equipo</h1>
           <p className="alerts critical" role="alert">{error}</p>
           <Link className="detail-btn" to="/inventario">Volver al inventario</Link>
         </section>
@@ -187,7 +186,6 @@ export default function Ficha({ token: tokenProp }) {
     <main className="app ficha-page">
       <section className={`panel ficha ${conModelo ? 'con-modelo' : ''}`}>
         <header className="header">
-          <h1>Ficha del equipo</h1>
           <div className="header-actions">
             <button className="btn secondary" onClick={() => window.print()}>Imprimir código y QR</button>
             <button className="btn primary" onClick={() => setEditing(true)}>Editar equipo</button>

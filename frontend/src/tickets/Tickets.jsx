@@ -7,7 +7,6 @@ import usePageMeta from '../usePageMeta.js';
 import {
   codigo, etiqueta, normalizarCodigoSgl, PRIORIDADES,
 } from '../normalizacion.js';
-import AdminPanel from './AdminPanel.jsx';
 
 const USER_TABS = [
   { scope: 'mios-pendientes', label: 'Pendientes', hint: 'Tus tickets abiertos, en proceso o resueltos' },
@@ -407,7 +406,6 @@ export default function Tickets() {
   return (
     <main className="app tickets-page">
       <header className="header">
-        <h1>Tickets</h1>
         <div className="header-actions">
           <button type="button" className="btn primary" onClick={() => setNuevoAbierto(true)}>
             Nuevo ticket
@@ -639,7 +637,6 @@ export default function Tickets() {
         </section>
       </div>
 
-      {esAdmin && <AdminPanel />}
       {nuevoAbierto && <NewTicketModal onClose={() => setNuevoAbierto(false)} onCreated={alCrear} />}
     </main>
   );

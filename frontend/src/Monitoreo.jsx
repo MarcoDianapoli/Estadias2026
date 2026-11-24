@@ -214,7 +214,6 @@ export default function Monitoreo() {
   return (
     <main className="app">
       <header className="header">
-        <h1>Monitoreo remoto de equipos</h1>
         <Link className="detail-btn" to="/">Ir al panel general</Link>
       </header>
 
