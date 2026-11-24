@@ -12,10 +12,15 @@ const TITULOS = {
   '/configuracion': 'Configuración',
 };
 
+const SUBTITULOS = {
+  '/configuracion': 'Tu cuenta, seguridad y preferencias de la sesión local.',
+};
+
 export default function Topbar({ onAbrirSidebar }) {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const titulo = TITULOS[pathname] || (pathname.startsWith('/ficha') ? 'Ficha' : 'Loganmex');
+  const subtitulo = SUBTITULOS[pathname];
 
   return (
     <header className="topbar">
@@ -29,7 +34,10 @@ export default function Topbar({ onAbrirSidebar }) {
           <path d="M4 7h16M4 12h16M4 17h16" />
         </svg>
       </button>
-      <h1 className="topbar-title">{titulo}</h1>
+      <div className="topbar-titulo">
+        <h1 className="topbar-title">{titulo}</h1>
+        {subtitulo && <p className="topbar-subtitulo">{subtitulo}</p>}
+      </div>
       <div className="topbar-actions">
         <NotificationBell />
         <Link

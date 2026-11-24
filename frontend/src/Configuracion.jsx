@@ -73,10 +73,7 @@ export default function Configuracion() {
   return (
     <main className="app configuracion-page">
       <header className="header">
-        <div>
-          <h1>Configuración</h1>
-          <p>Tu cuenta, seguridad y preferencias de la sesión local.</p>
-        </div>
+        <h1>Configuración</h1>
       </header>
 
       <div className="config-layout">
