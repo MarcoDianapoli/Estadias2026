@@ -7,6 +7,7 @@ const pool = require('./db');
 const assetsRouter = require('./modules/assets');
 const authRouter = require('./modules/auth');
 const ticketsRouter = require('./modules/tickets');
+const maintenanceRouter = require('./modules/maintenance');
 const { requireAuth, requireRole, parseToken, getUserFromToken } = require('./modules/auth');
 
 const app = express();
@@ -153,6 +154,7 @@ app.use('/api', requireAuth);
 app.use('/api/assets', soloStaff);
 app.use('/api/assets', assetsRouter);
 app.use('/api/tickets', ticketsRouter);
+app.use('/api/maintenance', soloStaff, maintenanceRouter);
 
 app.get('/api/links/status', soloStaff, async (_req, res) => {
     try {

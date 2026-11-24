@@ -6,7 +6,7 @@ import Dashboard from './Dashboard.jsx';
 import Monitoreo from './Monitoreo.jsx';
 import Inventario from './Inventario.jsx';
 import Ficha from './Ficha.jsx';
-import ModulePlaceholder from './ModulePlaceholder.jsx';
+import Mantenimiento from './Mantenimiento.jsx';
 import Tickets from './tickets/Tickets.jsx';
 
 function LegacyFicha() {
@@ -52,20 +52,7 @@ function AppShell() {
         <Route path="/inventario.html" element={soloStaff(<LegacyFicha />)} />
         <Route path="/tickets" element={<Tickets />} />
 
-        <Route
-          path="/mantenimiento"
-          element={soloStaff(
-            <ModulePlaceholder
-              title="Mantenimiento"
-              description="Mantenimiento preventivo y correctivo por código SGL con fecha programada y responsable. La agenda se habilitará en la siguiente entrega."
-              modules={[
-                { title: 'Semana actual', text: 'Pendientes con fecha programada de lunes a domingo.' },
-                { title: 'Orden de trabajo', text: 'Actividad, responsable y observaciones por equipo.' },
-                { title: 'Estatus reales', text: 'Pendiente / En proceso / Completado / Cancelado.' },
-              ]}
-            />
-          )}
-        />
+        <Route path="/mantenimiento" element={soloStaff(<Mantenimiento />)} />
 
         <Route path="*" element={<Navigate to={inicio} replace />} />
       </Routes>

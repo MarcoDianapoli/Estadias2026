@@ -64,7 +64,7 @@ copy backend\.env.example backend\.env     # Windows
 | `DB_HOST` | Servidor de MySQL | `localhost` |
 | `DB_USER` / `DB_PASSWORD` | Credenciales | `monitoreo` |
 | `DB_NAME` | Base de datos | `monitoreo` |
-| `ENCRYPTION_KEY` | Clave AES de 32 bytes en hexadecimal para cifrar credenciales | generar con `openssl rand -hex 32` |
+| `ENCRYPTION_KEY` | Clave secreta de al menos 16 caracteres; se deriva a 32 bytes con SHA-256 para AES-256-GCM. Si falta, la API no arranca. No cambiarla después de cifrar credenciales | frase larga y aleatoria |
 | `AGENT_DEVICE_ID` | Nombre del equipo | `PC-01` |
 | `AGENT_INTERVAL` | Frecuencia de lectura (ms) | `5000` |
 | `API_URL` | Destino de las métricas | `http://localhost:3001` |
@@ -108,7 +108,7 @@ Cuentas de arranque creadas por `npm run migrate:tickets` (solo para poner en ma
 |---|---|---|
 | `Usuario demo` | `1111` | Usuario |
 | `Técnico demo` | `2222` | Técnico |
-| `Admin demo` | `3333` | Administrador |
+| `Admin demo` | `9999` | Administrador |
 
 - **Usuario:** único módulo disponible es **Tickets**: registra incidencias y consulta sus propios tickets en las secciones «Pendientes» y «Cerrados». Dashboard, monitoreo, inventario, fichas, mantenimiento y sus APIs responden con redirección o `403`.
 - **Técnico:** ve exactamente cuatro apartados: **Generales** (todos los pendientes sin tomar), **Tomados** (los que toma y aún no cierra), **Cerrados** y **Chat**. Toma tickets por autoadjudicación y cambia estatus a Resuelto/Cerrado.
@@ -130,8 +130,11 @@ Al abrir **http://localhost:5173**:
 3. **Inventario QR (`/inventario`):** altas, edición, importación/exportación, QR, vinculación y credenciales. Los códigos van de `SGL-0001` en adelante.
 4. **Ficha (`/ficha?ficha=<token>`):** datos, QR, modelo 3D representativo y comentarios. «Imprimir código y QR» imprime solo el código y el QR.
 5. **Tickets (`/tickets`):** registro, bitácora y chat de incidencias. El encabezado muestra el usuario/rol activo y «Salir» cierra la sesión.
+6. **Mantenimiento (`/mantenimiento`):** órdenes por código SGL con fecha programada, responsable, observaciones y estatus (Pendiente / En proceso / Completado / Cancelado). Hay filtro de semana actual y de estatus; técnicos y administradores crean y editan, y solo el administrador elimina. API: `GET/POST /api/maintenance`, `GET/PATCH/DELETE /api/maintenance/:id`.
 
 La gráfica, los estados, los tickets y el chat se actualizan solos gracias a Socket.IO. La campana del encabezado muestra avisos en vivo: ticket nuevo (técnicos y administradores), ticket tomado (solicitante y administradores) y mensajes de chat (participantes y administradores). Cada aviso reproduce un sonido breve generado por Web Audio API (sin archivos ni dependencias); el botón de altavoz dentro de la campana los silencia o los reactiva. El usuario normal también ve la campana, pero sin los avisos de vinculación del inventario. Técnicos y administradores están en la sala `tickets` y ven todas las incidencias; cada usuario normal se une solo a `ticket-user:<id>`, por lo que por socket solo recibe eventos de sus propios tickets.
+
+La interfaz añade animaciones sutiles de entrada en tarjetas, paneles, listas, campana y mensajes de error, además de transiciones al pasar el cursor por los botones. Si el sistema tiene activado «reducir movimiento», las animaciones se desactivan automáticamente.
 
 ---
 
@@ -177,7 +180,7 @@ curl http://localhost:3001/api/health
 # Login local y token para el resto de endpoints
 TOKEN=$(curl -s -X POST http://localhost:3001/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"nombre":"Admin demo","pin":"3333"}' \
+  -d '{"nombre":"Admin demo","pin":"9999"}' \
   | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).token")
 
 curl -H "Authorization: Bearer $TOKEN" http://localhost:3001/api/devices
@@ -218,4 +221,4 @@ npm run build
 - 2026-11-09 · Frontend base, sesión, diseño y accesibilidad.
 - 2026-11-16 · Módulos de monitoreo, inventario y ficha.
 - 2026-11-23 · Consola de tickets, notificaciones y sonidos.
-- 2026-11-24 · Aislamiento por usuario y verificación final.
+- 2026-11-24 · Aislamiento por usuario, verificación final, cifrado estricto, animaciones y módulo de Mantenimiento.

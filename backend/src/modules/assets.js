@@ -8,9 +8,12 @@ const router = express.Router();
 const publicRouter = express.Router();
 
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
-const CIPHER_KEY = crypto.createHash('sha256')
-  .update(process.env.ENCRYPTION_KEY || 'cambia-esta-llave')
-  .digest();
+const rawKey = process.env.ENCRYPTION_KEY;
+if (!rawKey || rawKey.length < 16 || rawKey === 'cambia-esta-llave') {
+  throw new Error('ENCRYPTION_KEY inválida: define una clave secreta de al menos 16 caracteres');
+}
+// Se mantiene la derivación original para no invalidar credenciales ya cifradas.
+const CIPHER_KEY = crypto.createHash('sha256').update(rawKey).digest();
 
 const COLUMNS = [
   'codigo', 'device_id', 'tipo', 'familias', 'marca', 'modelo', 'numero_serie',

@@ -63,16 +63,6 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="login-hint" role="note">
-          <strong>Cuentas de arranque</strong>
-          <p>Solo para poner en marcha el módulo en la LAN:</p>
-          <ul>
-            <li>Usuario demo · PIN 1111</li>
-            <li>Técnico demo · PIN 2222</li>
-            <li>Admin demo · PIN 3333</li>
-          </ul>
-          <small>Cámbialas desde la consola de administración.</small>
-        </div>
       </div>
     </main>
   );

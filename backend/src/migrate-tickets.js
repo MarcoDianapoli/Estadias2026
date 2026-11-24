@@ -6,11 +6,11 @@ const pool = require('./db');
 
 const ROLES = ['usuario', 'tecnico', 'admin'];
 
-// Cuentas de arranque para probar el módulo en LAN. El PIN se sustituye en el primer login.
+// Cuentas de arranque para probar el módulo en LAN. Cámbialas desde la consola de administración.
 const BOOTSTRAP_USERS = [
   { nombre: 'Usuario demo', pin: '1111', rol: 'usuario' },
   { nombre: 'Técnico demo', pin: '2222', rol: 'tecnico' },
-  { nombre: 'Admin demo', pin: '3333', rol: 'admin' },
+  { nombre: 'Admin demo', pin: '9999', rol: 'admin' },
 ];
 
 function hashPin(pin, salt = crypto.randomBytes(16).toString('hex')) {
