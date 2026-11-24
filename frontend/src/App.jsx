@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
 import Sidebar from './Sidebar.jsx';
+import Topbar from './Topbar.jsx';
 import Login from './Login.jsx';
 import Dashboard from './Dashboard.jsx';
 import Monitoreo from './Monitoreo.jsx';
@@ -25,6 +26,7 @@ function LegacyFicha() {
 function AppShell() {
   const { user, loading } = useAuth();
   const [menuExpandido, setMenuExpandido] = useState(false);
+  const [sidebarMovil, setSidebarMovil] = useState(false);
 
   if (loading) {
     return (
@@ -48,8 +50,11 @@ function AppShell() {
       <Sidebar
         expandido={menuExpandido}
         onToggle={() => setMenuExpandido((valor) => !valor)}
+        abiertoMovil={sidebarMovil}
+        onCerrarMovil={() => setSidebarMovil(false)}
       />
       <div className={`contenido-app${menuExpandido ? ' sidebar-abierta' : ''}`}>
+        <Topbar onAbrirSidebar={() => setSidebarMovil(true)} />
         <Routes>
           <Route path="/" element={soloStaff(<Dashboard />)} />
           <Route path="/monitoreo" element={soloStaff(<Monitoreo />)} />

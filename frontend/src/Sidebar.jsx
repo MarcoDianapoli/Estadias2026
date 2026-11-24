@@ -1,5 +1,4 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import NotificationBell from './NotificationBell.jsx';
 import { useAuth } from './AuthContext.jsx';
 import { etiqueta } from './normalizacion.js';
 
@@ -55,6 +54,13 @@ const icons = {
       <path d="M10 21h4" />
     </>
   ),
+  ayuda: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.6 9a2.5 2.5 0 1 1 4.2 1.8c-1 .9-1.8 1.3-1.8 2.7" />
+      <path d="M12 17h.01" />
+    </>
+  ),
   accesos: (
     <>
       <circle cx="9" cy="8" r="3" />
@@ -90,104 +96,134 @@ const configLinks = [
   { hash: '#cuenta', label: 'Mi cuenta', detalle: 'Datos de la sesión', icon: 'cuenta' },
   { hash: '#seguridad', label: 'Seguridad', detalle: 'Cambiar mi PIN', icon: 'seguridad' },
   { hash: '#notificaciones', label: 'Notificaciones', detalle: 'Sonido de avisos', icon: 'campana' },
-  { hash: '#sesion', label: 'Sesión', detalle: 'Cerrar sesión local', icon: 'salir' },
+  { hash: '#ayuda', label: 'Ayuda', detalle: 'Uso local y LAN', icon: 'ayuda' },
 ];
 
 const ROLES = { usuario: 'Usuario', tecnico: 'Técnico', admin: 'Administrador' };
 
-export default function Sidebar({ expandido, onToggle }) {
-  const { user } = useAuth();
+export default function Sidebar({ expandido, onToggle, abiertoMovil, onCerrarMovil }) {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const esUsuario = user.rol === 'usuario';
   const enlaces = esUsuario ? links.filter((link) => link.to === '/tickets') : links;
   const inicio = esUsuario ? '/tickets' : '/';
 
   function ir(hash) {
+    onCerrarMovil();
     navigate(`/configuracion${hash}`);
   }
 
+  async function salir() {
+    onCerrarMovil();
+    await logout();
+    navigate('/', { replace: true });
+  }
+
   return (
-    <aside className={`sidebar${expandido ? ' expandida' : ''}`} aria-label="Navegación principal">
-      <div className="sidebar-top">
-        <NavLink to={inicio} className="sidebar-brand" end title="Loganmex">
-          <span className="brand-mark" aria-hidden="true">LM</span>
-          <span className="sidebar-label brand-label">
-            <strong>Loganmex</strong>
-            <small>Monitoreo e inventario</small>
-          </span>
-        </NavLink>
-        <div className="sidebar-bell"><NotificationBell /></div>
-      </div>
-
-      <nav className="sidebar-nav" aria-label="Módulos">
-        {enlaces.map(({ to, label, icon, end }) => (
+    <>
+      {abiertoMovil && (
+        <div className="sidebar-backdrop" onClick={onCerrarMovil} aria-hidden="true" />
+      )}
+      <aside
+        className={`sidebar${expandido ? ' expandida' : ''}${abiertoMovil ? ' abierto-movil' : ''}`}
+        aria-label="Navegación principal"
+      >
+        <div className="sidebar-top">
           <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-            title={expandido ? undefined : label}
+            to={inicio}
+            className="sidebar-brand"
+            end
+            title="Loganmex"
+            onClick={onCerrarMovil}
           >
-            <Icono nombre={icon} />
-            <span className="sidebar-label">{label}</span>
+            <span className="brand-mark" aria-hidden="true">LM</span>
+            <span className="sidebar-label brand-label">
+              <strong>Loganmex</strong>
+              <small>Monitoreo e inventario</small>
+            </span>
           </NavLink>
-        ))}
-      </nav>
+        </div>
 
-      <div className="sidebar-bottom">
-        <div id="sidebar-config" className="sidebar-config" aria-hidden={!expandido}>
-          <p className="sidebar-section-title">Configuración</p>
-          {configLinks.map(({ hash, label, detalle, icon }) => (
+        <nav className="sidebar-nav" aria-label="Módulos">
+          {enlaces.map(({ to, label, icon, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+              title={expandido ? undefined : label}
+              onClick={onCerrarMovil}
+            >
+              <Icono nombre={icon} />
+              <span className="sidebar-label">{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="sidebar-bottom">
+          <div id="sidebar-config" className="sidebar-config" aria-hidden={!expandido}>
+            <p className="sidebar-section-title">Cuenta y configuración</p>
+            {configLinks.map(({ hash, label, detalle, icon }) => (
+              <button
+                key={hash}
+                type="button"
+                className="sidebar-link sidebar-config-link"
+                tabIndex={expandido ? 0 : -1}
+                onClick={() => ir(hash)}
+              >
+                <Icono nombre={icon} />
+                <span className="sidebar-label">
+                  <strong>{label}</strong>
+                  <small>{detalle}</small>
+                </span>
+              </button>
+            ))}
+            {user.rol === 'admin' && (
+              <button
+                type="button"
+                className="sidebar-link sidebar-config-link sidebar-link-admin"
+                tabIndex={expandido ? 0 : -1}
+                onClick={() => ir('#accesos')}
+              >
+                <Icono nombre="accesos" />
+                <span className="sidebar-label">
+                  <strong>Administración de accesos</strong>
+                  <small>Cuentas y roles del sistema</small>
+                </span>
+              </button>
+            )}
             <button
-              key={hash}
               type="button"
               className="sidebar-link sidebar-config-link"
               tabIndex={expandido ? 0 : -1}
-              onClick={() => ir(hash)}
+              onClick={salir}
             >
-              <Icono nombre={icon} />
+              <Icono nombre="salir" />
               <span className="sidebar-label">
-                <strong>{label}</strong>
-                <small>{detalle}</small>
+                <strong>Cerrar sesión</strong>
+                <small>Salir de este dispositivo</small>
               </span>
             </button>
-          ))}
-          {user.rol === 'admin' && (
-            <button
-              type="button"
-              className="sidebar-link sidebar-config-link sidebar-link-admin"
-              tabIndex={expandido ? 0 : -1}
-              onClick={() => ir('#accesos')}
-            >
-              <Icono nombre="accesos" />
-              <span className="sidebar-label">
-                <strong>Administración de accesos</strong>
-                <small>Cuentas y roles del sistema</small>
-              </span>
-            </button>
-          )}
-        </div>
+          </div>
 
-        <button
-          type="button"
-          className="sidebar-user"
-          onClick={onToggle}
-          aria-expanded={expandido}
-          aria-controls="sidebar-config"
-          title={expandido ? 'Contraer menú' : 'Expandir menú y configuración'}
-        >
-          <span className="session-avatar" aria-hidden="true">
-            {etiqueta(user.nombre).slice(0, 1).toUpperCase()}
-          </span>
-          <span className="sidebar-label sidebar-user-label">
-            <strong>{etiqueta(user.nombre)}</strong>
-            <small>{ROLES[user.rol] || etiqueta(user.rol)}</small>
-          </span>
-          <svg className={`sidebar-chevron${expandido ? ' girado' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M9 6l6 6-6 6" />
-          </svg>
-        </button>
-      </div>
-    </aside>
+          <button
+            type="button"
+            className="sidebar-user"
+            onClick={onToggle}
+            aria-expanded={expandido}
+            aria-controls="sidebar-config"
+            title={expandido ? 'Contraer menú' : 'Expandir cuenta y configuración'}
+          >
+            <span className="sidebar-label sidebar-user-label">
+              <strong>{etiqueta(user.nombre)}</strong>
+              <small>{ROLES[user.rol] || etiqueta(user.rol)}</small>
+            </span>
+            <svg className={`sidebar-chevron${expandido ? ' girado' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

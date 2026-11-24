@@ -177,6 +177,20 @@ export default function Configuracion() {
           <button type="button" className="btn secondary" onClick={salir}>Cerrar sesión</button>
         </section>
 
+        <section id="ayuda" className="panel config-panel" aria-labelledby="config-ayuda-title">
+          <div className="panel-title">
+            <div>
+              <h2 id="config-ayuda-title">Ayuda</h2>
+              <p className="hint">Uso básico de la consola local.</p>
+            </div>
+          </div>
+          <ul className="config-ayuda">
+            <li>Entra con tu usuario y PIN; la sesión dura 12 horas en este dispositivo.</li>
+            <li>La campana de la barra superior muestra los avisos en vivo; puedes silenciarlos aquí o en el panel.</li>
+            <li>Los tickets, el inventario y el mantenimiento se actualizan solos mientras la app esté abierta.</li>
+          </ul>
+        </section>
+
         {user.rol === 'admin' && (
           <div id="accesos" className="config-admin">
             <AdminPanel />
