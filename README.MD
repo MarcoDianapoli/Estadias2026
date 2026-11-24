@@ -130,7 +130,7 @@ Al abrir **http://localhost:5173**:
 3. **Inventario QR (`/inventario`):** altas, edición, importación/exportación, QR, vinculación y credenciales. Los códigos van de `SGL-0001` en adelante.
 4. **Ficha (`/ficha?ficha=<token>`):** datos, QR, modelo 3D representativo y comentarios. «Imprimir código y QR» imprime solo el código y el QR.
 5. **Tickets (`/tickets`):** registro, bitácora y chat de incidencias. El encabezado muestra el usuario/rol activo y «Salir» cierra la sesión.
-6. **Mantenimiento (`/mantenimiento`):** órdenes por código SGL con fecha programada, responsable, observaciones y estatus (Pendiente / En proceso / Completado / Cancelado). Hay filtro de semana actual y de estatus; técnicos y administradores crean y editan, y solo el administrador elimina. API: `GET/POST /api/maintenance`, `GET/PATCH/DELETE /api/maintenance/:id`.
+6. **Mantenimiento (`/mantenimiento`):** órdenes por código SGL con fecha programada, responsable, observaciones y estatus (Pendiente / En proceso / Completado / Cancelado). El tipo es **Lógico** (limpieza de archivos temporales y afines) o **Físico** (sopleteado y limpieza con alcohol isopropílico). Hay filtros de periodo, estatus y tipo, e indicador de la meta semanal de **10–12 equipos**; la operación contempla **3 visitas por equipo al año** (≈36 equipos por ronda). Técnicos y administradores crean y editan, y solo el administrador elimina. API: `GET/POST /api/maintenance`, `GET/PATCH/DELETE /api/maintenance/:id`.
 
 La gráfica, los estados, los tickets y el chat se actualizan solos gracias a Socket.IO. La campana del encabezado muestra avisos en vivo: ticket nuevo (técnicos y administradores), ticket tomado (solicitante y administradores) y mensajes de chat (participantes y administradores). Cada aviso reproduce un sonido breve generado por Web Audio API (sin archivos ni dependencias); el botón de altavoz dentro de la campana los silencia o los reactiva. El usuario normal también ve la campana, pero sin los avisos de vinculación del inventario. Técnicos y administradores están en la sala `tickets` y ven todas las incidencias; cada usuario normal se une solo a `ticket-user:<id>`, por lo que por socket solo recibe eventos de sus propios tickets.
 
@@ -221,4 +221,4 @@ npm run build
 - 2026-11-09 · Frontend base, sesión, diseño y accesibilidad.
 - 2026-11-16 · Módulos de monitoreo, inventario y ficha.
 - 2026-11-23 · Consola de tickets, notificaciones y sonidos.
-- 2026-11-24 · Aislamiento por usuario, verificación final, cifrado estricto, animaciones y módulo de Mantenimiento.
+- 2026-11-24 · Aislamiento por usuario, verificación final, cifrado estricto, animaciones, módulo de Mantenimiento y tipos Lógico/Físico con meta semanal.

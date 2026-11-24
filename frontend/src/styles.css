@@ -61,6 +61,8 @@ body { margin: 0; }
 }
 .badge.online { background: #dcfce7; color: #15803d; }
 .badge.offline { background: #fee2e2; color: #b91c1c; }
+.badge.logico { background: #eff6ff; color: #1d4ed8; }
+.badge.fisico { background: #fffbeb; color: #92400e; }
 
 .cards {
   display: grid; grid-template-columns: repeat(4, 1fr);

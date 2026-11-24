@@ -5,6 +5,9 @@ import useDialog from './useDialog.js';
 import usePageMeta from './usePageMeta.js';
 
 const ESTATUS = ['Pendiente', 'En proceso', 'Completado', 'Cancelado'];
+const TIPOS = ['Lógico', 'Físico'];
+const META_SEMANAL = [10, 12];
+const VISITAS_POR_ANIO = 3;
 const CLASE_ESTATUS = {
   Pendiente: 'offline',
   'En proceso': 'online',
@@ -15,6 +18,7 @@ const CLASE_ESTATUS = {
 const formularioVacio = {
   actividad: '',
   codigo: '',
+  tipo: 'Lógico',
   fecha_programada: '',
   estatus: 'Pendiente',
   responsable: '',
@@ -51,10 +55,19 @@ function EstadoBadge({ estatus }) {
   );
 }
 
+function TipoBadge({ tipo }) {
+  return (
+    <span className={`badge ${tipo === 'Físico' ? 'fisico' : 'logico'}`}>
+      {tipo || 'Lógico'}
+    </span>
+  );
+}
+
 function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
   const [form, setForm] = useState(() => orden ? {
     actividad: orden.actividad || '',
     codigo: orden.codigo || '',
+    tipo: TIPOS.includes(orden.tipo) ? orden.tipo : 'Lógico',
     fecha_programada: aInputLocal(orden.fecha_programada),
     estatus: ESTATUS.includes(orden.estatus) ? orden.estatus : 'Pendiente',
     responsable: orden.responsable || '',
@@ -96,6 +109,7 @@ function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
         <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar" disabled={guardando}>×</button>
         <h3 id={titleId}>{orden ? 'Editar orden de mantenimiento' : 'Nueva orden de mantenimiento'}</h3>
         <p className="modal-sub">
+          Físico: sopleteado y limpieza con alcohol isopropílico. Lógico: limpieza de archivos temporales.
           La fecha programada se muestra en el dashboard cuando la orden está pendiente dentro de la semana actual.
         </p>
 
@@ -121,6 +135,12 @@ function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
               maxLength={32}
               placeholder="SGL-0001 (opcional)"
             />
+          </label>
+          <label>
+            Tipo
+            <select name="tipo" value={form.tipo} onChange={change}>
+              {TIPOS.map((tipo) => <option key={tipo}>{tipo}</option>)}
+            </select>
           </label>
           <label>
             Fecha y hora programada
@@ -180,6 +200,8 @@ export default function Mantenimiento() {
 
   const [semana, setSemana] = useState('todos');
   const [estatus, setEstatus] = useState('');
+  const [tipo, setTipo] = useState('');
+  const [equiposSemana, setEquiposSemana] = useState(0);
   const [mantenimientos, setMantenimientos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -189,12 +211,26 @@ export default function Mantenimiento() {
   const [notice, setNotice] = useState('');
   const [formAbierta, setFormAbierta] = useState(null);
 
+  const loadMeta = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/maintenance?semana=actual');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'No se pudo cargar la meta semanal');
+      const items = Array.isArray(data.mantenimientos) ? data.mantenimientos : [];
+      const codigos = new Set(items.map((item) => item.codigo).filter(Boolean));
+      setEquiposSemana(codigos.size);
+    } catch {
+      setEquiposSemana(0);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setCargando(true);
     setError('');
     const parametros = new URLSearchParams();
     if (semana === 'actual') parametros.set('semana', 'actual');
     if (estatus) parametros.set('estatus', estatus);
+    if (tipo) parametros.set('tipo', tipo);
     const query = parametros.toString();
 
     try {
@@ -202,13 +238,14 @@ export default function Mantenimiento() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudieron cargar los mantenimientos');
       setMantenimientos(Array.isArray(data.mantenimientos) ? data.mantenimientos : []);
+      await loadMeta();
     } catch (err) {
       setError(mensajeError(err));
       setMantenimientos([]);
     } finally {
       setCargando(false);
     }
-  }, [semana, estatus]);
+  }, [semana, estatus, tipo, loadMeta]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -250,6 +287,7 @@ export default function Mantenimiento() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudo eliminar la orden');
       setMantenimientos((prev) => prev.filter((item) => item.id !== orden.id));
+      await loadMeta();
       setNotice('Orden de mantenimiento eliminada');
     } catch (err) {
       setAccionError(mensajeError(err));
@@ -281,6 +319,26 @@ export default function Mantenimiento() {
       {accionError && <p className="form-error" role="alert">{accionError}</p>}
       {notice && <p className="alerts ok" role="status">{notice}</p>}
 
+      <section className="cards maintenance-meta" aria-label="Meta de mantenimiento">
+        <div className="card">
+          <span>Equipos esta semana</span>
+          <strong className={equiposSemana >= META_SEMANAL[0] && equiposSemana <= META_SEMANAL[1] ? 'green' : 'red'}>
+            {equiposSemana}
+          </strong>
+          <small>Meta: {META_SEMANAL[0]}–{META_SEMANAL[1]} equipos</small>
+        </div>
+        <div className="card">
+          <span>Visitas por equipo</span>
+          <strong>{VISITAS_POR_ANIO}</strong>
+          <small>Por año</small>
+        </div>
+        <div className="card">
+          <span>Equipos por ronda</span>
+          <strong>~{META_SEMANAL[1] * VISITAS_POR_ANIO}</strong>
+          <small>{VISITAS_POR_ANIO} rondas al año</small>
+        </div>
+      </section>
+
       <section className="panel">
         <div className="panel-title">
           <h2>Órdenes de trabajo ({mantenimientos.length})</h2>
@@ -301,6 +359,15 @@ export default function Mantenimiento() {
                 ))}
               </select>
             </label>
+            <label>
+              Tipo
+              <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                <option value="">Todos</option>
+                {TIPOS.map((tipoOption) => (
+                  <option key={tipoOption} value={tipoOption}>{tipoOption}</option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
@@ -310,6 +377,7 @@ export default function Mantenimiento() {
               <tr>
                 <th>Código SGL</th>
                 <th>Actividad</th>
+                <th>Tipo</th>
                 <th>Fecha programada</th>
                 <th>Estatus</th>
                 <th>Responsable</th>
@@ -319,11 +387,11 @@ export default function Mantenimiento() {
             </thead>
             <tbody>
               {cargando && (
-                <tr><td colSpan="7" className="empty" role="status">Cargando mantenimientos…</td></tr>
+                <tr><td colSpan="8" className="empty" role="status">Cargando mantenimientos…</td></tr>
               )}
               {!cargando && !mantenimientos.length && (
                 <tr>
-                  <td colSpan="7" className="empty">
+                  <td colSpan="8" className="empty">
                     No hay órdenes de mantenimiento con estos filtros. Usa «Nueva orden» para registrar una.
                   </td>
                 </tr>
@@ -334,6 +402,7 @@ export default function Mantenimiento() {
                   <td>
                     <strong>{orden.actividad}</strong>
                   </td>
+                  <td><TipoBadge tipo={orden.tipo} /></td>
                   <td>{formatearFecha(orden.fecha_programada)}</td>
                   <td>
                     <EstadoBadge estatus={orden.estatus} />

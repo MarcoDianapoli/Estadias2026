@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS maintenance (
     id INT NOT NULL AUTO_INCREMENT,
     codigo VARCHAR(32) DEFAULT NULL,
     actividad VARCHAR(180) NOT NULL,
+    tipo ENUM('Lógico', 'Físico') NOT NULL DEFAULT 'Lógico',
     fecha_programada DATETIME NOT NULL,
     estatus ENUM('Pendiente', 'En proceso', 'Completado', 'Cancelado') NOT NULL DEFAULT 'Pendiente',
     responsable VARCHAR(128) DEFAULT NULL,

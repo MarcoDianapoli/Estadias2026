@@ -57,6 +57,7 @@ async function main() {
   await addColumn('tickets', 'tomado_en', 'TIMESTAMP NULL DEFAULT NULL AFTER updated_at');
   await addColumn('tickets', 'resuelto_en', 'TIMESTAMP NULL DEFAULT NULL AFTER tomado_en');
   await addColumn('tickets', 'cerrado_en', 'TIMESTAMP NULL DEFAULT NULL AFTER resuelto_en');
+  await addColumn('maintenance', 'tipo', "ENUM('Lógico', 'Físico') NOT NULL DEFAULT 'Lógico' AFTER actividad");
 
   for (const user of BOOTSTRAP_USERS) {
     const [existing] = await pool.query('SELECT id FROM ticket_users WHERE nombre = ?', [user.nombre]);

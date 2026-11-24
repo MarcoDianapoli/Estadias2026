@@ -4,6 +4,7 @@ const { requireRole } = require('./auth');
 
 const router = express.Router();
 const STATUSES = ['Pendiente', 'En proceso', 'Completado', 'Cancelado'];
+const TIPOS = ['Lógico', 'Físico'];
 
 function clean(value, max = 255) {
   return String(value ?? '').trim().slice(0, max);
@@ -67,10 +68,18 @@ router.get('/', async (req, res) => {
       condiciones.push('estatus = ?');
       params.push(estatus);
     }
+    if (req.query.tipo !== undefined && req.query.tipo !== '') {
+      const tipo = String(req.query.tipo);
+      if (!TIPOS.includes(tipo)) {
+        return res.status(400).json({ error: 'Tipo no válido' });
+      }
+      condiciones.push('tipo = ?');
+      params.push(tipo);
+    }
 
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const [rows] = await pool.execute(
-      `SELECT id, codigo, actividad, fecha_programada, estatus, responsable, observaciones, created_at
+      `SELECT id, codigo, actividad, tipo, fecha_programada, estatus, responsable, observaciones, created_at
          FROM maintenance
          ${where}
         ORDER BY fecha_programada ASC, id ASC`,
@@ -100,19 +109,24 @@ router.post('/', requireRole('tecnico', 'admin'), async (req, res) => {
   const estatus = req.body?.estatus === undefined || req.body?.estatus === ''
     ? 'Pendiente'
     : String(req.body.estatus);
+  const tipo = req.body?.tipo === undefined || req.body?.tipo === ''
+    ? 'Lógico'
+    : String(req.body.tipo);
 
   if (!actividad) return res.status(400).json({ error: 'La actividad es obligatoria' });
   if (!fecha) return res.status(400).json({ error: 'La fecha programada no es válida' });
   if (!STATUSES.includes(estatus)) return res.status(400).json({ error: 'Estatus no válido' });
+  if (!TIPOS.includes(tipo)) return res.status(400).json({ error: 'Tipo no válido' });
 
   try {
     const [result] = await pool.execute(
       `INSERT INTO maintenance
-        (codigo, actividad, fecha_programada, estatus, responsable, observaciones)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+        (codigo, actividad, tipo, fecha_programada, estatus, responsable, observaciones)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         clean(req.body?.codigo, 32) || null,
         actividad,
+        tipo,
         fecha,
         estatus,
         clean(req.body?.responsable, 128) || null,
@@ -141,6 +155,11 @@ router.patch('/:id', requireRole('tecnico', 'admin'), async (req, res) => {
     const actividad = clean(body.actividad, 180);
     if (!actividad) return res.status(400).json({ error: 'La actividad es obligatoria' });
     asignar('actividad', actividad);
+  }
+  if (tiene('tipo')) {
+    const tipo = String(body.tipo);
+    if (!TIPOS.includes(tipo)) return res.status(400).json({ error: 'Tipo no válido' });
+    asignar('tipo', tipo);
   }
   if (tiene('fecha_programada')) {
     const fecha = fechaProgramada(body.fecha_programada);
