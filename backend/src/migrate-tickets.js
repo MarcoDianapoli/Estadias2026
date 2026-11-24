@@ -7,10 +7,11 @@ const pool = require('./db');
 const ROLES = ['usuario', 'tecnico', 'admin'];
 
 // Cuentas de arranque para probar el módulo en LAN. Cámbialas desde la consola de administración.
+// Los nombres se guardan normalizados: minúsculas y sin acentos.
 const BOOTSTRAP_USERS = [
-  { nombre: 'Usuario demo', pin: '1111', rol: 'usuario' },
-  { nombre: 'Técnico demo', pin: '2222', rol: 'tecnico' },
-  { nombre: 'Admin demo', pin: '9999', rol: 'admin' },
+  { nombre: 'usuario demo', pin: '1111', rol: 'usuario' },
+  { nombre: 'tecnico demo', pin: '2222', rol: 'tecnico' },
+  { nombre: 'admin demo', pin: '9999', rol: 'admin' },
 ];
 
 function hashPin(pin, salt = crypto.randomBytes(16).toString('hex')) {
@@ -57,7 +58,7 @@ async function main() {
   await addColumn('tickets', 'tomado_en', 'TIMESTAMP NULL DEFAULT NULL AFTER updated_at');
   await addColumn('tickets', 'resuelto_en', 'TIMESTAMP NULL DEFAULT NULL AFTER tomado_en');
   await addColumn('tickets', 'cerrado_en', 'TIMESTAMP NULL DEFAULT NULL AFTER resuelto_en');
-  await addColumn('maintenance', 'tipo', "ENUM('Lógico', 'Físico') NOT NULL DEFAULT 'Lógico' AFTER actividad");
+  await addColumn('maintenance', 'tipo', "ENUM('logico', 'fisico') NOT NULL DEFAULT 'logico' AFTER actividad");
 
   for (const user of BOOTSTRAP_USERS) {
     const [existing] = await pool.query('SELECT id FROM ticket_users WHERE nombre = ?', [user.nombre]);

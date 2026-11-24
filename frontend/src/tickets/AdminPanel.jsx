@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../api.js';
+import { etiqueta, normalizarEntrada } from '../normalizacion.js';
 
 const ROLES = [
   { value: 'usuario', label: 'Usuario' },
@@ -41,12 +42,12 @@ export default function AdminPanel() {
     try {
       const res = await apiFetch('/api/auth/users', {
         method: 'POST',
-        body: JSON.stringify(nuevo),
+        body: JSON.stringify({ ...nuevo, nombre: normalizarEntrada(nuevo.nombre) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo crear el usuario');
       setNuevo({ nombre: '', pin: '', rol: 'usuario' });
-      setAviso(`Usuario ${data.nombre} creado.`);
+      setAviso(`Usuario ${etiqueta(data.nombre)} creado.`);
       await load();
     } catch (err) {
       setError(err.message);
@@ -87,14 +88,14 @@ export default function AdminPanel() {
       const res = await apiFetch(`/api/auth/users/${usuario.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          nombre: usuario.nombre,
+          nombre: normalizarEntrada(usuario.nombre),
           rol: usuario.rol,
           activo: usuario.activo ? 0 : 1,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el usuario');
-      setAviso(`${usuario.nombre} ${usuario.activo ? 'desactivado' : 'activado'}.`);
+      setAviso(`${etiqueta(usuario.nombre)} ${usuario.activo ? 'desactivado' : 'activado'}.`);
       await load();
     } catch (err) {
       setError(err.message);
@@ -107,11 +108,11 @@ export default function AdminPanel() {
     try {
       const res = await apiFetch(`/api/auth/users/${usuario.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ nombre: usuario.nombre, rol, activo: usuario.activo }),
+        body: JSON.stringify({ nombre: normalizarEntrada(usuario.nombre), rol, activo: usuario.activo }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el rol');
-      setAviso(`Rol de ${usuario.nombre} actualizado.`);
+      setAviso(`Rol de ${etiqueta(usuario.nombre)} actualizado.`);
       await load();
     } catch (err) {
       setError(err.message);
@@ -171,7 +172,7 @@ export default function AdminPanel() {
             <select value={cambioPin.id} onChange={(e) => setCambioPin({ ...cambioPin, id: e.target.value })} required>
               <option value="">Selecciona…</option>
               {users.map((usuario) => (
-                <option key={usuario.id} value={usuario.id}>{usuario.nombre}</option>
+                <option key={usuario.id} value={usuario.id}>{etiqueta(usuario.nombre)}</option>
               ))}
             </select>
           </label>
@@ -208,10 +209,10 @@ export default function AdminPanel() {
             <tbody>
               {users.map((usuario) => (
                 <tr key={usuario.id}>
-                  <td><strong>{usuario.nombre}</strong></td>
+                  <td><strong>{etiqueta(usuario.nombre)}</strong></td>
                   <td>
                     <select
-                      aria-label={`Rol de ${usuario.nombre}`}
+                      aria-label={`Rol de ${etiqueta(usuario.nombre)}`}
                       value={usuario.rol}
                       onChange={(e) => cambiarRol(usuario, e.target.value)}
                     >

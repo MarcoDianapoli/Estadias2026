@@ -4,6 +4,9 @@ import * as XLSX from 'xlsx';
 import AssetFormModal from './AssetFormModal';
 import { apiFetch } from './api.js';
 import { familiasText } from './families';
+import {
+  codigo, etiqueta, identificador, normalizarCodigoSgl, normalizarEntrada,
+} from './normalizacion.js';
 import usePageMeta from './usePageMeta';
 import useDialog from './useDialog';
 
@@ -54,8 +57,8 @@ function parseExcel(buffer) {
         raton: findCol(headers, 'raton', 'ratón'),
       };
       grid.slice(headerIndex + 1).forEach((r) => {
-        const codigo = str(r[col.codigo]).toUpperCase();
-        if (!/^SGL-\d+$/.test(codigo)) return;
+        const codigoSgl = normalizarCodigoSgl(str(r[col.codigo]));
+        if (!codigoSgl || !/^sgl-\d+$/.test(codigoSgl)) return;
         const cell = (i) => (i >= 0 ? str(r[i]).toLowerCase() : '');
         // El Excel usa 1, 2 (dos pantallas), etc. Guardamos la cantidad real.
         const cantidad = (i) => {
@@ -63,48 +66,48 @@ function parseExcel(buffer) {
           return /^\d+$/.test(value) ? Number(value) : 0;
         };
         const detected = {
-          CPU: cantidad(typeCol.cpu),
-          Teclado: cantidad(typeCol.teclado),
-          Ratón: cantidad(typeCol.raton),
-          Monitor: cantidad(typeCol.monitor),
-          Laptop: cantidad(typeCol.laptop),
+          cpu: cantidad(typeCol.cpu),
+          teclado: cantidad(typeCol.teclado),
+          raton: cantidad(typeCol.raton),
+          monitor: cantidad(typeCol.monitor),
+          laptop: cantidad(typeCol.laptop),
         };
         const counted = Object.fromEntries(
           Object.entries(detected).filter(([, qty]) => qty > 0)
         );
 
-        familias[codigo] = counted;
-        tipos[codigo] = detected.Laptop ? 'Laptop'
-          : detected.CPU ? 'Computadora'
-          : detected.Monitor ? 'Monitor'
-          : detected.Teclado ? 'Teclado'
-          : detected.Ratón ? 'Ratón'
-          : 'Equipo';
+        familias[codigoSgl] = counted;
+        tipos[codigoSgl] = detected.laptop ? 'laptop'
+          : detected.cpu ? 'computadora'
+          : detected.monitor ? 'monitor'
+          : detected.teclado ? 'teclado'
+          : detected.raton ? 'raton'
+          : 'equipo';
       });
       return;
     }
 
     grid.slice(headerIndex + 1).forEach((r) => {
-      const codigo = str(r[col.codigo]).toUpperCase();
-      if (!/^SGL-\d+$/.test(codigo)) return;
+      const codigoSgl = normalizarCodigoSgl(str(r[col.codigo]));
+      if (!codigoSgl || !/^sgl-\d+$/.test(codigoSgl)) return;
       rows.push({
-        codigo,
-        tipo: tipos[codigo] || 'Equipo',
-        familias: familias[codigo] || {},
-        responsable: str(r[col.usuario]),
-        ubicacion: str(r[col.departamento]),
+        codigo: codigoSgl,
+        tipo: tipos[codigoSgl] || 'equipo',
+        familias: familias[codigoSgl] || {},
+        responsable: normalizarEntrada(str(r[col.usuario])),
+        ubicacion: normalizarEntrada(str(r[col.departamento])),
         ipAddress: str(r[col.ip]),
-        correo: str(r[col.correo]),
-        vnc: str(r[col.vnc]),
+        correo: normalizarEntrada(str(r[col.correo])),
+        vnc: normalizarEntrada(str(r[col.vnc])),
         password: str(r[col.password]),
         adminPassword: str(r[col.admin]),
-        hostname: str(r[col.hostname]),
+        hostname: normalizarEntrada(str(r[col.hostname])),
       });
     });
   });
 
   rows.forEach((r) => {
-    r.tipo = tipos[r.codigo] || r.tipo || 'Equipo';
+    r.tipo = tipos[r.codigo] || r.tipo || 'equipo';
     r.familias = familias[r.codigo] || r.familias || {};
   });
   return rows;
@@ -222,25 +225,26 @@ export default function Inventario() {
   useEffect(() => {
     const accion = params.get('accion');
     if (!accion || !assets.length) return;
+    const codigoBuscado = normalizarCodigoSgl(params.get('codigo'));
 
     if (accion === 'registrar') {
       setFormInitial({
         prefill: {
-          codigo: params.get('codigo') || '',
-          deviceId: params.get('deviceId') || '',
+          codigo: codigoBuscado || '',
+          deviceId: normalizarEntrada(params.get('deviceId')) || '',
           ipAddress: params.get('ipAddress') || '',
-          hostname: params.get('hostname') || '',
+          hostname: normalizarEntrada(params.get('hostname')) || '',
           familias: {},
         },
       });
     } else if (accion === 'editar') {
-      const encontrado = assets.find((a) => a.codigo === params.get('codigo'));
+      const encontrado = assets.find((a) => a.codigo === codigoBuscado);
       if (encontrado) setFormInitial({ asset: encontrado });
     } else if (accion === 'vincular') {
-      const encontrado = assets.find((a) => a.codigo === params.get('codigo'));
+      const encontrado = assets.find((a) => a.codigo === codigoBuscado);
       if (encontrado) {
         setLinkAsset(encontrado);
-        setLinkDeviceId(params.get('deviceId') || encontrado.device_id || '');
+        setLinkDeviceId(normalizarEntrada(params.get('deviceId')) || encontrado.device_id || '');
       }
     } else {
       clearParams();
@@ -249,8 +253,8 @@ export default function Inventario() {
 
   const alGuardar = (data, esEdicion) => {
     setNotice(esEdicion
-      ? `${data.codigo} actualizado correctamente`
-      : `${data.codigo} registrado y QR generado`);
+      ? `${codigo(data.codigo)} actualizado correctamente`
+      : `${codigo(data.codigo)} registrado y QR generado`);
     cerrarForm();
     load();
   };
@@ -283,19 +287,19 @@ export default function Inventario() {
 
   const exportar = () => {
     const data = assets.map((a) => ({
-      Código: a.codigo,
-      Tipo: a.tipo,
+      Código: codigo(a.codigo),
+      Tipo: etiqueta(a.tipo),
       Familias: familiasText(a.familias),
-      Marca: a.marca || '',
-      Modelo: a.modelo || '',
-      'N.º de serie': a.numero_serie || '',
-      Usuario: a.responsable || '',
-      Departamento: a.ubicacion || '',
+      Marca: etiqueta(a.marca),
+      Modelo: etiqueta(a.modelo),
+      'N.º de serie': identificador(a.numero_serie),
+      Usuario: etiqueta(a.responsable),
+      Departamento: etiqueta(a.ubicacion),
       'Direccion IP': a.ip_address || '',
-      Correo: a.correo || '',
-      VNC: a.vnc || '',
-      'nombre del equipo': a.hostname || '',
-      'Agente vinculado': a.device_id || '',
+      Correo: etiqueta(a.correo),
+      VNC: identificador(a.vnc),
+      'nombre del equipo': identificador(a.hostname),
+      'Agente vinculado': identificador(a.device_id),
       Ficha: a.fichaUrl || '',
       Registrado: a.created_at || '',
     }));
@@ -317,7 +321,7 @@ export default function Inventario() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al vincular');
-      setNotice(`${linkAsset.codigo} vinculado al agente ${linkDeviceId}`);
+      setNotice(`${codigo(linkAsset.codigo)} vinculado al agente ${identificador(linkDeviceId)}`);
       cerrarLink();
       await load();
     } catch (err) {
@@ -330,7 +334,7 @@ export default function Inventario() {
     try {
       const res = await apiFetch(`/api/assets/${asset.id}/unlink`, { method: 'POST' });
       if (!res.ok) throw new Error('Error al desvincular');
-      setNotice(`${asset.codigo} desvinculado`);
+      setNotice(`${codigo(asset.codigo)} desvinculado`);
       await load();
     } catch (err) {
       setError(err.message);
@@ -342,7 +346,7 @@ export default function Inventario() {
     try {
       const res = await apiFetch(`/api/assets/${asset.id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('No se pudo eliminar el equipo');
-      setNotice(`${asset.codigo} eliminado`);
+      setNotice(`${codigo(asset.codigo)} eliminado`);
       await load();
     } catch (err) {
       setError(err.message);
@@ -433,21 +437,21 @@ export default function Inventario() {
               )}
               {visibles.map((a) => (
                 <tr key={a.id}>
-                  <td><strong className="code-badge">{a.codigo}</strong></td>
-                  <td>{a.tipo}</td>
-                  <td>{a.responsable || '—'}</td>
+                  <td><strong className="code-badge">{codigo(a.codigo)}</strong></td>
+                  <td>{etiqueta(a.tipo) || '—'}</td>
+                  <td>{etiqueta(a.responsable) || '—'}</td>
                   <td>{a.ip_address || '—'}</td>
                   <td>
                     {a.device_id ? (
                       <>
-                        <strong>{a.device_hostname || a.device_id}</strong>
-                        <small>{a.device_hostname ? a.device_id : ''}</small>
+                        <strong>{identificador(a.device_hostname || a.device_id)}</strong>
+                        <small>{a.device_hostname ? identificador(a.device_id) : ''}</small>
                       </>
                     ) : <span className="warn-text">Sin vincular</span>}
                   </td>
                   <td><code className="cred-text">{a.password || '—'}</code></td>
                   <td><code className="cred-text">{a.adminPassword || '—'}</code></td>
-                  <td><img className="qr-img" src={`/api/assets/${a.id}/qr`} alt={`QR de ${a.codigo}`} /></td>
+                  <td><img className="qr-img" src={`/api/assets/${a.id}/qr`} alt={`QR de ${codigo(a.codigo)}`} /></td>
                   <td><a className="detail-btn" href={a.fichaPath || a.fichaUrl} target="_blank" rel="noreferrer">Ver ficha</a></td>
                   <td>
                     <div className="row-actions">

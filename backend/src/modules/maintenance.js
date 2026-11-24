@@ -1,10 +1,11 @@
 const express = require('express');
 const pool = require('../db');
 const { requireRole } = require('./auth');
+const { normalizar, normalizarCodigoSgl } = require('../normalizacion');
 
 const router = express.Router();
-const STATUSES = ['Pendiente', 'En proceso', 'Completado', 'Cancelado'];
-const TIPOS = ['Lógico', 'Físico'];
+const STATUSES = ['pendiente', 'en proceso', 'completado', 'cancelado'];
+const TIPOS = ['logico', 'fisico'];
 
 function clean(value, max = 255) {
   return String(value ?? '').trim().slice(0, max);
@@ -61,7 +62,7 @@ router.get('/', async (req, res) => {
       params.push(inicio, fin);
     }
     if (req.query.estatus !== undefined && req.query.estatus !== '') {
-      const estatus = String(req.query.estatus);
+      const estatus = normalizar(req.query.estatus);
       if (!STATUSES.includes(estatus)) {
         return res.status(400).json({ error: 'Estatus no válido' });
       }
@@ -69,7 +70,7 @@ router.get('/', async (req, res) => {
       params.push(estatus);
     }
     if (req.query.tipo !== undefined && req.query.tipo !== '') {
-      const tipo = String(req.query.tipo);
+      const tipo = normalizar(req.query.tipo);
       if (!TIPOS.includes(tipo)) {
         return res.status(400).json({ error: 'Tipo no válido' });
       }
@@ -107,11 +108,11 @@ router.post('/', requireRole('tecnico', 'admin'), async (req, res) => {
   const actividad = clean(req.body?.actividad, 180);
   const fecha = fechaProgramada(req.body?.fecha_programada);
   const estatus = req.body?.estatus === undefined || req.body?.estatus === ''
-    ? 'Pendiente'
-    : String(req.body.estatus);
+    ? 'pendiente'
+    : normalizar(req.body.estatus);
   const tipo = req.body?.tipo === undefined || req.body?.tipo === ''
-    ? 'Lógico'
-    : String(req.body.tipo);
+    ? 'logico'
+    : normalizar(req.body.tipo);
 
   if (!actividad) return res.status(400).json({ error: 'La actividad es obligatoria' });
   if (!fecha) return res.status(400).json({ error: 'La fecha programada no es válida' });
@@ -124,12 +125,12 @@ router.post('/', requireRole('tecnico', 'admin'), async (req, res) => {
         (codigo, actividad, tipo, fecha_programada, estatus, responsable, observaciones)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        clean(req.body?.codigo, 32) || null,
+        normalizarCodigoSgl(req.body?.codigo)?.slice(0, 32) || null,
         actividad,
         tipo,
         fecha,
         estatus,
-        clean(req.body?.responsable, 128) || null,
+        normalizar(req.body?.responsable)?.slice(0, 128) || null,
         clean(req.body?.observaciones, 5000) || null,
       ],
     );
@@ -157,7 +158,7 @@ router.patch('/:id', requireRole('tecnico', 'admin'), async (req, res) => {
     asignar('actividad', actividad);
   }
   if (tiene('tipo')) {
-    const tipo = String(body.tipo);
+    const tipo = normalizar(body.tipo);
     if (!TIPOS.includes(tipo)) return res.status(400).json({ error: 'Tipo no válido' });
     asignar('tipo', tipo);
   }
@@ -167,12 +168,12 @@ router.patch('/:id', requireRole('tecnico', 'admin'), async (req, res) => {
     asignar('fecha_programada', fecha);
   }
   if (tiene('estatus')) {
-    const estatus = String(body.estatus);
+    const estatus = normalizar(body.estatus);
     if (!STATUSES.includes(estatus)) return res.status(400).json({ error: 'Estatus no válido' });
     asignar('estatus', estatus);
   }
-  if (tiene('codigo')) asignar('codigo', clean(body.codigo, 32) || null);
-  if (tiene('responsable')) asignar('responsable', clean(body.responsable, 128) || null);
+  if (tiene('codigo')) asignar('codigo', normalizarCodigoSgl(body.codigo)?.slice(0, 32) || null);
+  if (tiene('responsable')) asignar('responsable', normalizar(body.responsable)?.slice(0, 128) || null);
   if (tiene('observaciones')) asignar('observaciones', clean(body.observaciones, 5000) || null);
 
   if (!campos.length) return res.status(400).json({ error: 'No se recibieron cambios válidos' });

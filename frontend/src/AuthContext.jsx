@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { apiFetch, clearToken, getToken, setToken } from './api.js';
+import { normalizarEntrada } from './normalizacion.js';
 
 const AuthContext = createContext(null);
 
@@ -35,7 +36,7 @@ export function AuthProvider({ children }) {
   async function login(nombre, pin) {
     const res = await apiFetch('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ nombre, pin }),
+      body: JSON.stringify({ nombre: normalizarEntrada(nombre), pin }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'No se pudo iniciar sesión');

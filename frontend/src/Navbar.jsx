@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import NotificationBell from './NotificationBell.jsx';
 import { useAuth } from './AuthContext.jsx';
+import { etiqueta } from './normalizacion.js';
 
 const icons = {
   dashboard: (
@@ -82,13 +83,13 @@ export default function Navbar() {
             ))}
           </div>
           <NotificationBell />
-          <div className="session-chip" aria-label={`Sesión de ${user.nombre}`}>
+          <div className="session-chip" aria-label={`Sesión de ${etiqueta(user.nombre)}`}>
             <span className="session-avatar" aria-hidden="true">
-              {user.nombre.slice(0, 1).toUpperCase()}
+              {etiqueta(user.nombre).slice(0, 1).toUpperCase()}
             </span>
             <span className="session-info">
-              <strong>{user.nombre}</strong>
-              <small>{ROLES[user.rol] || user.rol}</small>
+              <strong>{etiqueta(user.nombre)}</strong>
+              <small>{ROLES[user.rol] || etiqueta(user.rol)}</small>
             </span>
             <button type="button" className="session-logout" onClick={logout} title="Cerrar sesión">
               Salir

@@ -40,7 +40,7 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Código para los registros que ya existían (por ejemplo, el equipo de prueba).
 UPDATE assets
-SET codigo = CONCAT('SGL-', LPAD(id, 4, '0'))
+SET codigo = CONCAT('sgl-', LPAD(id, 4, '0'))
 WHERE codigo IS NULL OR codigo = '';
 
 SET @sql = (SELECT IF(
@@ -67,7 +67,7 @@ INSERT INTO asset_sequence (id, next_value) VALUES (1, 1)
 UPDATE asset_sequence
 SET next_value = GREATEST(next_value,
     (SELECT IFNULL(MAX(CAST(SUBSTRING(codigo, 5) AS UNSIGNED)), 0) + 1
-     FROM assets WHERE codigo REGEXP '^SGL-[0-9]+$'))
+     FROM assets WHERE codigo REGEXP '^sgl-[0-9]+$'))
 WHERE id = 1;
 
 SHOW COLUMNS FROM assets;

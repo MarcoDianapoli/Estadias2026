@@ -3,24 +3,28 @@ import { apiFetch } from './api.js';
 import { useAuth } from './AuthContext.jsx';
 import useDialog from './useDialog.js';
 import usePageMeta from './usePageMeta.js';
+import {
+  codigo, etiqueta, normalizarCodigoSgl, normalizarEntrada,
+  ESTADOS_MANTENIMIENTO, TIPOS_MANTENIMIENTO,
+} from './normalizacion.js';
 
-const ESTATUS = ['Pendiente', 'En proceso', 'Completado', 'Cancelado'];
-const TIPOS = ['Lógico', 'Físico'];
+const ESTATUS = ESTADOS_MANTENIMIENTO;
+const TIPOS = TIPOS_MANTENIMIENTO;
 const META_SEMANAL = [10, 12];
 const VISITAS_POR_ANIO = 3;
 const CLASE_ESTATUS = {
-  Pendiente: 'offline',
-  'En proceso': 'online',
-  Completado: 'online',
-  Cancelado: 'offline',
+  pendiente: 'offline',
+  'en proceso': 'online',
+  completado: 'online',
+  cancelado: 'offline',
 };
 
 const formularioVacio = {
   actividad: '',
   codigo: '',
-  tipo: 'Lógico',
+  tipo: 'logico',
   fecha_programada: '',
-  estatus: 'Pendiente',
+  estatus: 'pendiente',
   responsable: '',
   observaciones: '',
 };
@@ -50,15 +54,15 @@ function mensajeError(err) {
 function EstadoBadge({ estatus }) {
   return (
     <span className={`badge ${CLASE_ESTATUS[estatus] || 'offline'}`}>
-      {estatus}
+      {etiqueta(estatus)}
     </span>
   );
 }
 
 function TipoBadge({ tipo }) {
   return (
-    <span className={`badge ${tipo === 'Físico' ? 'fisico' : 'logico'}`}>
-      {tipo || 'Lógico'}
+    <span className={`badge ${tipo === 'fisico' ? 'fisico' : 'logico'}`}>
+      {etiqueta(tipo) || 'Lógico'}
     </span>
   );
 }
@@ -67,9 +71,9 @@ function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
   const [form, setForm] = useState(() => orden ? {
     actividad: orden.actividad || '',
     codigo: orden.codigo || '',
-    tipo: TIPOS.includes(orden.tipo) ? orden.tipo : 'Lógico',
+    tipo: TIPOS.includes(normalizarEntrada(orden.tipo)) ? normalizarEntrada(orden.tipo) : 'logico',
     fecha_programada: aInputLocal(orden.fecha_programada),
-    estatus: ESTATUS.includes(orden.estatus) ? orden.estatus : 'Pendiente',
+    estatus: ESTATUS.includes(normalizarEntrada(orden.estatus)) ? normalizarEntrada(orden.estatus) : 'pendiente',
     responsable: orden.responsable || '',
     observaciones: orden.observaciones || '',
   } : { ...formularioVacio });
@@ -85,7 +89,12 @@ function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
     try {
       const res = await apiFetch(orden ? `/api/maintenance/${orden.id}` : '/api/maintenance', {
         method: orden ? 'PATCH' : 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          codigo: normalizarCodigoSgl(form.codigo) || '',
+          tipo: normalizarEntrada(form.tipo),
+          estatus: normalizarEntrada(form.estatus),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudo guardar la orden');
@@ -133,13 +142,13 @@ function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
               value={form.codigo}
               onChange={change}
               maxLength={32}
-              placeholder="SGL-0001 (opcional)"
+              placeholder="sgl-0001 (opcional)"
             />
           </label>
           <label>
             Tipo
             <select name="tipo" value={form.tipo} onChange={change}>
-              {TIPOS.map((tipo) => <option key={tipo}>{tipo}</option>)}
+              {TIPOS.map((tipo) => <option key={tipo} value={tipo}>{etiqueta(tipo)}</option>)}
             </select>
           </label>
           <label>
@@ -165,7 +174,7 @@ function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
           <label>
             Estatus
             <select name="estatus" value={form.estatus} onChange={change}>
-              {ESTATUS.map((estatus) => <option key={estatus}>{estatus}</option>)}
+              {ESTATUS.map((estatus) => <option key={estatus} value={estatus}>{etiqueta(estatus)}</option>)}
             </select>
           </label>
           <label className="full">
@@ -250,16 +259,17 @@ export default function Mantenimiento() {
   useEffect(() => { load(); }, [load]);
 
   const alGuardar = (data, esEdicion) => {
+    const etiquetaOrden = codigo(data.codigo) || data.actividad;
     setNotice(esEdicion
-      ? `${data.codigo || data.actividad} actualizado correctamente`
-      : `${data.codigo || data.actividad} registrado correctamente`);
+      ? `${etiquetaOrden} actualizado correctamente`
+      : `${etiquetaOrden} registrado correctamente`);
     setAccionError('');
     setFormAbierta(null);
     load();
   };
 
   async function cambiarEstatus(orden, nuevoEstatus) {
-    if (nuevoEstatus === orden.estatus) return;
+    if (normalizarEntrada(nuevoEstatus) === normalizarEntrada(orden.estatus)) return;
     setAccionError('');
     setProcesandoId(orden.id);
     try {
@@ -270,7 +280,7 @@ export default function Mantenimiento() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudo cambiar el estatus');
       setMantenimientos((prev) => prev.map((item) => (item.id === orden.id ? data : item)));
-      setNotice(`Estatus actualizado a ${nuevoEstatus}`);
+      setNotice(`Estatus actualizado a ${etiqueta(nuevoEstatus)}`);
     } catch (err) {
       setAccionError(mensajeError(err));
     } finally {
@@ -355,7 +365,7 @@ export default function Mantenimiento() {
               <select value={estatus} onChange={(e) => setEstatus(e.target.value)}>
                 <option value="">Todos</option>
                 {ESTATUS.map((estatusOption) => (
-                  <option key={estatusOption} value={estatusOption}>{estatusOption}</option>
+                  <option key={estatusOption} value={estatusOption}>{etiqueta(estatusOption)}</option>
                 ))}
               </select>
             </label>
@@ -364,7 +374,7 @@ export default function Mantenimiento() {
               <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
                 <option value="">Todos</option>
                 {TIPOS.map((tipoOption) => (
-                  <option key={tipoOption} value={tipoOption}>{tipoOption}</option>
+                  <option key={tipoOption} value={tipoOption}>{etiqueta(tipoOption)}</option>
                 ))}
               </select>
             </label>
@@ -398,7 +408,7 @@ export default function Mantenimiento() {
               )}
               {!cargando && mantenimientos.map((orden) => (
                 <tr key={orden.id}>
-                  <td><strong className="code-badge">{orden.codigo || '—'}</strong></td>
+                  <td><strong className="code-badge">{codigo(orden.codigo) || '—'}</strong></td>
                   <td>
                     <strong>{orden.actividad}</strong>
                   </td>
@@ -410,14 +420,14 @@ export default function Mantenimiento() {
                       value={orden.estatus}
                       onChange={(e) => cambiarEstatus(orden, e.target.value)}
                       disabled={guardando || procesandoId === orden.id}
-                      aria-label={`Cambiar estatus de ${orden.codigo || orden.actividad}`}
+                      aria-label={`Cambiar estatus de ${codigo(orden.codigo) || orden.actividad}`}
                     >
                       {ESTATUS.map((estatusOption) => (
-                        <option key={estatusOption} value={estatusOption}>{estatusOption}</option>
+                        <option key={estatusOption} value={estatusOption}>{etiqueta(estatusOption)}</option>
                       ))}
                     </select>
                   </td>
-                  <td>{orden.responsable || '—'}</td>
+                  <td>{etiqueta(orden.responsable) || '—'}</td>
                   <td>{orden.observaciones || '—'}</td>
                   <td>
                     <div className="row-actions">

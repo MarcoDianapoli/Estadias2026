@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import Chart from 'chart.js/auto';
 import { apiFetch, socketOptions } from './api.js';
+import { identificador } from './normalizacion.js';
 import usePageMeta from './usePageMeta';
 import useDialog from './useDialog';
 
@@ -14,6 +15,7 @@ const CHART_POINTS = 40;
 const value = (m, camel, snake) => Number(m?.[camel] ?? m?.[snake] ?? 0);
 const idOf = (m) => m?.deviceId ?? m?.device_id;
 const timeOf = (m) => m?.recordedAt ?? m?.recorded_at;
+const nombreEquipo = (d) => identificador(d?.hostname || d?.device_id) || 'equipo';
 
 function Bar({ value: v, label = 'Uso' }) {
   const level = v >= CRITICAL ? 'critical' : v >= WARNING ? 'warning' : '';
@@ -116,7 +118,7 @@ export default function Monitoreo() {
       if (!d.online) {
         list.push({
           id: d.device_id,
-          text: `${d.hostname || d.device_id}: sin conexión (más de 20 s sin datos)`,
+          text: `${nombreEquipo(d)}: sin conexión (más de 20 s sin datos)`,
           level: 'critical',
         });
         return;
@@ -130,9 +132,9 @@ export default function Monitoreo() {
       ].forEach(([camel, snake, label]) => {
         const v = value(m, camel, snake);
         if (v >= CRITICAL) {
-          list.push({ id: d.device_id, text: `${d.hostname || d.device_id}: ${label} al ${v.toFixed(1)}% (crítico)`, level: 'critical' });
+          list.push({ id: d.device_id, text: `${nombreEquipo(d)}: ${label} al ${v.toFixed(1)}% (crítico)`, level: 'critical' });
         } else if (v >= WARNING) {
-          list.push({ id: d.device_id, text: `${d.hostname || d.device_id}: ${label} al ${v.toFixed(1)}% (aviso)`, level: 'warning' });
+          list.push({ id: d.device_id, text: `${nombreEquipo(d)}: ${label} al ${v.toFixed(1)}% (aviso)`, level: 'warning' });
         }
       });
     });
@@ -203,7 +205,8 @@ export default function Monitoreo() {
   const criticalCount = alerts.filter((a) => a.level === 'critical').length;
   const detailDevice = devices.find((d) => d.device_id === detailId) || null;
   const detailMetric = detailDevice ? latest.get(detailDevice.device_id) : null;
-  const selectedLabel = devices.find((d) => d.device_id === selectedId)?.hostname || selectedId;
+  const seleccionado = devices.find((d) => d.device_id === selectedId);
+  const selectedLabel = seleccionado ? nombreEquipo(seleccionado) : identificador(selectedId);
   const cerrarDetalle = () => setDetailId('');
   const detailDialogRef = useDialog(cerrarDetalle, Boolean(detailDevice));
   const detailTitleId = useId();
@@ -240,7 +243,7 @@ export default function Monitoreo() {
               <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
                 <option value="">Selecciona un equipo</option>
                 {devices.map((d) => (
-                  <option key={d.device_id} value={d.device_id}>{d.hostname || d.device_id}</option>
+                  <option key={d.device_id} value={d.device_id}>{nombreEquipo(d)}</option>
                 ))}
               </select>
             </label>
@@ -264,18 +267,18 @@ export default function Monitoreo() {
                   const diskUsage = value(m, 'diskUsage', 'disk_usage');
                   return (
                     <tr key={d.device_id}>
-                      <td><strong>{d.hostname || d.device_id}</strong><small>{d.device_id}</small></td>
+                      <td><strong>{nombreEquipo(d)}</strong><small>{identificador(d.device_id)}</small></td>
                       <td>{d.ip_address || m?.ipAddress || '—'}</td>
                       <td>
-                        <Bar value={cpuUsage} label={`CPU de ${d.hostname || d.device_id}`} />
+                        <Bar value={cpuUsage} label={`CPU de ${nombreEquipo(d)}`} />
                         {cpuSpeed > 0 && <small>{cpuSpeed.toFixed(2)} GHz</small>}
                       </td>
                       <td>
-                        <Bar value={memUsage} label={`RAM de ${d.hostname || d.device_id}`} />
+                        <Bar value={memUsage} label={`RAM de ${nombreEquipo(d)}`} />
                         {memTotal > 0 && <small>{usageLabel(memTotal, memUsage)}</small>}
                       </td>
                       <td>
-                        <Bar value={diskUsage} label={`Disco de ${d.hostname || d.device_id}`} />
+                        <Bar value={diskUsage} label={`Disco de ${nombreEquipo(d)}`} />
                         {diskTotal > 0 && <small>{usageLabel(diskTotal, diskUsage)}</small>}
                       </td>
                       <td>{d.seconds_ago == null ? '—' : `hace ${d.seconds_ago} s`}</td>
@@ -337,8 +340,8 @@ export default function Monitoreo() {
             onClick={(e) => e.stopPropagation()}
           >
             <button type="button" className="modal-close" onClick={cerrarDetalle} aria-label="Cerrar">×</button>
-            <h3 id={detailTitleId}>{detailDevice.hostname || detailDevice.device_id}</h3>
-            <p className="modal-sub">{detailDevice.device_id}</p>
+            <h3 id={detailTitleId}>{nombreEquipo(detailDevice)}</h3>
+            <p className="modal-sub">{identificador(detailDevice.device_id)}</p>
 
             <div className="detail-grid">
               <span>IP principal (LAN)</span>

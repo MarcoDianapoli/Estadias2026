@@ -1,7 +1,7 @@
 {
-  "deviceId": "PC-01",
+  "deviceId": "pc-01",
   "assetCode": "",
   "apiUrl": "http://localhost:3001",
   "intervalMs": 5000,
-  "_nota": "Este equipo no aparece en el Excel de inventario. Escribe aquí su código SGL (por ejemplo SGL-0123) para que se vincule automáticamente al iniciar el agente."
+  "_nota": "Este equipo no aparece en el Excel de inventario. Escribe aquí su código SGL (por ejemplo sgl-0123) para que se vincule automáticamente al iniciar el agente."
 }

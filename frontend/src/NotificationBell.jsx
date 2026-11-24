@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { apiFetch, socketOptions } from './api.js';
 import { useAuth } from './AuthContext.jsx';
+import { codigo, etiqueta, identificador } from './normalizacion.js';
 import { alternarSonido, estaSilenciado, reproducirSonido, resumirAudio } from './sounds.js';
 
 const EMPTY = {
@@ -65,7 +66,7 @@ export default function NotificationBell() {
 
     socket.on('tickets:update', (payload) => {
       if (!payload?.ticketId || payload.actor?.id === user.id) return;
-      const titulo = payload.titulo || payload.codigo || 'Ticket';
+      const titulo = payload.titulo || codigo(payload.codigo) || 'Ticket';
       const momento = hora();
 
       if (payload.accion === 'creado' && esStaff) {
@@ -73,7 +74,7 @@ export default function NotificationBell() {
           key: `creado-${payload.ticketId}`,
           level: 'info',
           title: 'Nuevo ticket recibido',
-          text: `${cortar(titulo)}${payload.solicitante_nombre ? ` · ${payload.solicitante_nombre}` : ''}`,
+          text: `${cortar(titulo)}${payload.solicitante_nombre ? ` · ${etiqueta(payload.solicitante_nombre)}` : ''}`,
           to: '/tickets',
           action: 'Ver tickets',
           time: momento,
@@ -87,7 +88,7 @@ export default function NotificationBell() {
           key: `tomado-${payload.ticketId}`,
           level: 'success',
           title: user.rol === 'usuario' ? 'Tu ticket fue tomado' : 'Ticket tomado',
-          text: `${cortar(titulo)}${payload.tecnico_nombre ? ` · ${payload.tecnico_nombre}` : ''}`,
+          text: `${cortar(titulo)}${payload.tecnico_nombre ? ` · ${etiqueta(payload.tecnico_nombre)}` : ''}`,
           to: '/tickets',
           action: 'Ver ticket',
           time: momento,
@@ -107,8 +108,8 @@ export default function NotificationBell() {
       push({
         key: `mensaje-${mensaje.id || `${payload.ticketId}-${mensaje.creado_en}`}`,
         level: 'chat',
-        title: `Mensaje en ${payload.codigo || 'ticket'}`,
-        text: `${mensaje.usuario_nombre || 'Alguien'}: ${cortar(mensaje.mensaje)}`,
+        title: `Mensaje en ${codigo(payload.codigo) || 'ticket'}`,
+        text: `${etiqueta(mensaje.usuario_nombre) || 'Alguien'}: ${cortar(mensaje.mensaje)}`,
         to: '/tickets',
         action: 'Abrir chat',
         time: hora(mensaje.creado_en),
@@ -174,14 +175,14 @@ export default function NotificationBell() {
         key: `u-${d.deviceId}`,
         level: 'warning',
         title: 'Agente sin vincular',
-        text: `${d.hostname || d.deviceId} reporta ${d.assetCode}, que ya está en el inventario. Vínculalo para completar la ficha.`,
+        text: `${identificador(d.hostname || d.deviceId)} reporta ${codigo(d.assetCode)}, que ya está en el inventario. Vínculalo para completar la ficha.`,
         to: toLink(d.assetCode, d.deviceId),
         action: 'Vincular',
       } : {
         key: `u-${d.deviceId}`,
         level: 'warning',
         title: 'Equipo sin registrar ni vincular',
-        text: `${d.hostname || d.deviceId} (${d.ipAddress || 'sin IP'}) está detectado, pero no tiene registro ni código SGL. Regístralo y el agente se vinculará solo.`,
+        text: `${identificador(d.hostname || d.deviceId)} (${d.ipAddress || 'sin IP'}) está detectado, pero no tiene registro ni código SGL. Regístralo y el agente se vinculará solo.`,
         to: toRegister(d, d.assetCode || ''),
         action: 'Registrar y vincular',
       });
@@ -191,7 +192,7 @@ export default function NotificationBell() {
         key: `i-${m.codigo}`,
         level: 'critical',
         title: 'La dirección IP no concuerda',
-        text: `${m.codigo} tiene ${m.assetIp} en el inventario, pero su agente reporta ${m.deviceIp}. Corrige la IP del registro.`,
+        text: `${codigo(m.codigo)} tiene ${m.assetIp} en el inventario, pero su agente reporta ${m.deviceIp}. Corrige la IP del registro.`,
         to: toEdit(m.codigo, 'ip'),
         action: 'Corregir IP',
       });
@@ -201,7 +202,7 @@ export default function NotificationBell() {
         key: `n-${c.deviceId}`,
         level: 'critical',
         title: 'Código SGL no existe',
-        text: `${c.hostname || c.deviceId} reporta ${c.assetCode}, que no está registrado. Crea la ficha con ese código y se vinculará.`,
+        text: `${identificador(c.hostname || c.deviceId)} reporta ${codigo(c.assetCode)}, que no está registrado. Crea la ficha con ese código y se vinculará.`,
         to: toRegister(c, c.assetCode),
         action: 'Registrar y vincular',
       });
@@ -211,7 +212,7 @@ export default function NotificationBell() {
         key: `c-${c.deviceId}`,
         level: 'critical',
         title: 'Código reportado por dos equipos',
-        text: `${c.assetCode} lo envía ${c.hostname || c.deviceId}, pero ya está vinculado a ${c.linkedTo}. Revisa la ficha.`,
+        text: `${codigo(c.assetCode)} lo envía ${identificador(c.hostname || c.deviceId)}, pero ya está vinculado a ${identificador(c.linkedTo)}. Revisa la ficha.`,
         to: toEdit(c.assetCode),
         action: 'Revisar ficha',
       });

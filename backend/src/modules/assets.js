@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const pool = require('../db');
 const { parseToken, getUserFromToken } = require('./auth');
+const { normalizar, normalizarCodigoSgl, normalizarFamilias } = require('../normalizacion');
 
 const router = express.Router();
 const publicRouter = express.Router();
@@ -85,11 +86,7 @@ function clean(value) {
 }
 
 function normalizeCodigo(value) {
-  const text = clean(value);
-  if (!text) return null;
-  const compact = text.toUpperCase().replace(/\s+/g, '');
-  const match = compact.match(/^SGL-?0*(\d{1,6})$/);
-  return match ? `SGL-${match[1].padStart(4, '0')}` : compact;
+  return normalizarCodigoSgl(value);
 }
 
 function encrypt(value) {
@@ -121,77 +118,29 @@ function decrypt(value) {
   }
 }
 
-const FAMILY_LABELS = {
-  cpu: 'CPU',
-  teclado: 'Teclado',
-  raton: 'Ratón',
-  monitor: 'Monitor',
-  laptop: 'Laptop',
-};
-
-function familyKey(value) {
-  return String(value ?? '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
-const FAMILY_ORDER = Object.keys(FAMILY_LABELS).map((key) => FAMILY_LABELS[key]);
-
-// Acepta { Monitor: 2 }, ["Monitor"] o "Monitor,Laptop" (formato anterior)
-// y guarda siempre JSON con cantidades: {"Monitor":2,"Laptop":1}.
+// Las familias se guardan con claves canónicas; el frontend las capitaliza al mostrar.
 function normalizeFamilias(value) {
-  if (value === undefined || value === null) return null;
-  let source = value;
-  if (typeof source === 'string') {
-    const text = source.trim();
-    if (!text) return null;
-    if (text.startsWith('{')) {
-      try { source = JSON.parse(text); } catch { source = text; }
-    }
-  }
-
-  const counts = new Map();
-  const add = (key, quantity) => {
-    const label = FAMILY_LABELS[familyKey(key)];
-    if (!label) return;
-    const number = Number.parseInt(quantity, 10);
-    counts.set(label, Number.isFinite(number) && number > 0 ? Math.min(number, 99) : 1);
-  };
-
-  if (Array.isArray(source)) {
-    source.forEach((item) => add(item, 1));
-  } else if (typeof source === 'object') {
-    Object.entries(source).forEach(([key, quantity]) => add(key, quantity));
-  } else {
-    String(source).split(/[,;|]+/).forEach((item) => add(item, 1));
-  }
-
-  const labels = FAMILY_ORDER.filter((label) => counts.has(label));
-  return labels.length
-    ? JSON.stringify(Object.fromEntries(labels.map((label) => [label, counts.get(label)])))
-    : null;
+  return normalizarFamilias(value);
 }
 
 function mapBody(body = {}) {
   return {
     codigo: normalizeCodigo(body.codigo),
-    device_id: clean(body.deviceId),
-    tipo: clean(body.tipo) || 'Equipo',
+    device_id: normalizar(body.deviceId),
+    tipo: normalizar(body.tipo) || 'equipo',
     familias: normalizeFamilias(body.familias),
-    marca: clean(body.marca),
-    modelo: clean(body.modelo),
-    numero_serie: clean(body.numeroSerie),
-    hostname: clean(body.hostname),
+    marca: normalizar(body.marca),
+    modelo: normalizar(body.modelo),
+    numero_serie: normalizar(body.numeroSerie),
+    hostname: normalizar(body.hostname),
     ip_address: clean(body.ipAddress),
-    correo: clean(body.correo),
-    vnc: clean(body.vnc),
+    correo: normalizar(body.correo),
+    vnc: normalizar(body.vnc),
     password_cifrado: encrypt(body.password),
     admin_password_cifrado: encrypt(body.adminPassword),
     rustdesk_password_cifrado: encrypt(body.rustdeskPassword),
-    ubicacion: clean(body.ubicacion),
-    responsable: clean(body.responsable),
+    ubicacion: normalizar(body.ubicacion),
+    responsable: normalizar(body.responsable),
     notas: clean(body.notas),
   };
 }
@@ -204,7 +153,7 @@ async function reserveCodigo(connection) {
   const [rows] = await connection.query('SELECT next_value FROM asset_sequence WHERE id = 1 FOR UPDATE');
   const next = rows[0].next_value;
   await connection.query('UPDATE asset_sequence SET next_value = next_value + 1 WHERE id = 1');
-  return `SGL-${String(next).padStart(4, '0')}`;
+  return `sgl-${String(next).padStart(4, '0')}`;
 }
 
 async function syncSequence(connection) {
@@ -212,17 +161,15 @@ async function syncSequence(connection) {
     UPDATE asset_sequence
     SET next_value = GREATEST(next_value,
       (SELECT IFNULL(MAX(CAST(SUBSTRING(codigo, 5) AS UNSIGNED)), 0) + 1
-       FROM assets WHERE codigo REGEXP '^SGL-[0-9]+$'))
+       FROM assets WHERE codigo REGEXP '^sgl-[0-9]+$'))
     WHERE id = 1
   `);
 }
 
-// Normaliza el código que envía el agente: "sgl1", "SGL-0001" y "SGL-1" son el mismo.
+// Normaliza el código que envía el agente: "sgl1", "SGL-0001" y "sgl-1" son el mismo.
 function normalizeAssetCode(value) {
-  const text = clean(value);
-  if (!text) return null;
-  const match = text.toUpperCase().replace(/\s+/g, '').match(/^SGL-?0*(\d{1,6})$/);
-  return match ? `SGL-${match[1].padStart(4, '0')}` : null;
+  const texto = normalizarCodigoSgl(value);
+  return texto && /^sgl-\d+$/.test(texto) ? texto : null;
 }
 
 // Estado usado por la campana de notificaciones.
@@ -539,7 +486,7 @@ router.post('/:id/comments', async (req, res) => {
   if (comentario.length > 2000) {
     return res.status(400).json({ error: 'El comentario es demasiado largo' });
   }
-  const autor = (clean(req.body?.autor) || 'Anónimo').slice(0, 128);
+  const autor = (normalizar(req.body?.autor) || 'anonimo').slice(0, 128);
 
   try {
     const [asset] = await pool.execute('SELECT id FROM assets WHERE id = ?', [req.params.id]);

@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS assets (
     codigo VARCHAR(32) NOT NULL UNIQUE,
     qr_token VARCHAR(64) NOT NULL UNIQUE,
     device_id VARCHAR(64) DEFAULT NULL,
-    tipo VARCHAR(64) NOT NULL DEFAULT 'Equipo',
+    tipo VARCHAR(64) NOT NULL DEFAULT 'equipo',
     familias VARCHAR(255) DEFAULT NULL,
     marca VARCHAR(64) DEFAULT NULL,
     modelo VARCHAR(64) DEFAULT NULL,
@@ -83,8 +83,8 @@ CREATE TABLE IF NOT EXISTS tickets (
     codigo VARCHAR(32) DEFAULT NULL,
     titulo VARCHAR(180) NOT NULL,
     descripcion TEXT DEFAULT NULL,
-    estado ENUM('Abierto', 'En proceso', 'Resuelto', 'Cerrado') NOT NULL DEFAULT 'Abierto',
-    prioridad ENUM('Baja', 'Media', 'Alta') NOT NULL DEFAULT 'Media',
+    estado ENUM('abierto', 'en proceso', 'resuelto', 'cerrado') NOT NULL DEFAULT 'abierto',
+    prioridad ENUM('baja', 'media', 'alta') NOT NULL DEFAULT 'media',
     responsable VARCHAR(128) DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP NOT NULL DEFAULT current_timestamp ON UPDATE current_timestamp,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS maintenance (
     codigo VARCHAR(32) DEFAULT NULL,
     actividad VARCHAR(180) NOT NULL,
     fecha_programada DATETIME NOT NULL,
-    estatus ENUM('Pendiente', 'En proceso', 'Completado', 'Cancelado') NOT NULL DEFAULT 'Pendiente',
+    estatus ENUM('pendiente', 'en proceso', 'completado', 'cancelado') NOT NULL DEFAULT 'pendiente',
     responsable VARCHAR(128) DEFAULT NULL,
     observaciones TEXT DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS maintenance (
     KEY idx_maintenance_estatus (estatus)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Contador atómico para los códigos SGL-0001, SGL-0002, ...
+-- Contador atómico para los códigos sgl-0001, sgl-0002, ...
 CREATE TABLE IF NOT EXISTS asset_sequence (
     id INT NOT NULL PRIMARY KEY,
     next_value INT NOT NULL

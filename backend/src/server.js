@@ -9,6 +9,7 @@ const authRouter = require('./modules/auth');
 const ticketsRouter = require('./modules/tickets');
 const maintenanceRouter = require('./modules/maintenance');
 const { requireAuth, requireRole, parseToken, getUserFromToken } = require('./modules/auth');
+const { normalizar } = require('./normalizacion');
 
 const app = express();
 const server = http.createServer(app);
@@ -65,9 +66,11 @@ app.post('/api/metrics', async (req, res) => {
       cpuUsage, cpuSpeedGhz, memoryUsage, memoryTotal, diskUsage, diskTotal,
     } = req.body || {};
 
-    if (!deviceId) {
+    const dispositivo = normalizar(deviceId);
+    if (!dispositivo) {
       return res.status(400).json({ error: 'deviceId es obligatorio' });
     }
+    const hostnameNormalizado = normalizar(hostname) || dispositivo;
 
     // Convierte vacíos a null para que MySQL nunca reciba "undefined"
     const num = (v) => {
@@ -84,7 +87,7 @@ app.post('/api/metrics', async (req, res) => {
          ip_address = VALUES(ip_address),
          network_interfaces = VALUES(network_interfaces),
          last_seen = NOW()`,
-      [deviceId, hostname || deviceId, ipAddress || null, JSON.stringify(networkInterfaces || [])]
+      [dispositivo, hostnameNormalizado, ipAddress || null, JSON.stringify(networkInterfaces || [])]
     );
 
     // El agente lee su código SGL desde agent.config.json y lo envía con las métricas.
@@ -92,7 +95,7 @@ app.post('/api/metrics', async (req, res) => {
     const codigo = assetsRouter.normalizeAssetCode(assetCode);
     await pool.execute(
       'UPDATE devices SET asset_code = ? WHERE device_id = ?',
-      [codigo, deviceId]
+      [codigo, dispositivo]
     );
 
     let linkedAsset = null;
@@ -101,8 +104,8 @@ app.post('/api/metrics', async (req, res) => {
         'SELECT id, device_id FROM assets WHERE codigo = ?',
         [codigo]
       );
-      if (found.length && (!found[0].device_id || found[0].device_id === deviceId)) {
-        await pool.execute('UPDATE assets SET device_id = ? WHERE id = ?', [deviceId, found[0].id]);
+      if (found.length && (!found[0].device_id || found[0].device_id === dispositivo)) {
+        await pool.execute('UPDATE assets SET device_id = ? WHERE id = ?', [dispositivo, found[0].id]);
         linkedAsset = codigo;
       }
     }
@@ -113,7 +116,7 @@ app.post('/api/metrics', async (req, res) => {
           disk_usage, disk_total, ip_address)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        deviceId,
+        dispositivo,
         num(cpuUsage),
         num(cpuSpeedGhz),
         num(memoryUsage),
@@ -126,7 +129,7 @@ app.post('/api/metrics', async (req, res) => {
 
     const metric = {
       id: result.insertId,
-      deviceId, hostname, ipAddress,
+      deviceId: dispositivo, hostname: hostnameNormalizado, ipAddress,
       assetCode: codigo, linkedAsset,
       cpuUsage, cpuSpeedGhz, memoryUsage, memoryTotal, diskUsage, diskTotal,
       recordedAt: new Date().toISOString(),
@@ -171,15 +174,15 @@ app.get('/api/dashboard/summary', soloStaff, async (_req, res) => {
         const [ticketRows] = await pool.query(`
             SELECT
                 COUNT(*) AS total,
-                SUM(estado = 'Abierto') AS abiertos,
-                SUM(estado = 'En proceso') AS enProceso
+                SUM(estado = 'abierto') AS abiertos,
+                SUM(estado = 'en proceso') AS enProceso
             FROM tickets
         `);
         const { inicio, fin } = currentWeekRange();
         const [maintRows] = await pool.execute(
             `SELECT COUNT(*) AS pendientes
              FROM maintenance
-             WHERE estatus = 'Pendiente'
+             WHERE estatus = 'pendiente'
                AND fecha_programada >= ? AND fecha_programada < ?`,
             [inicio, fin]
         );
@@ -217,7 +220,7 @@ app.get('/api/devices', soloStaff, async (_req, res) => {
 app.get('/api/metrics', soloStaff, async (req, res) => {
     try {
         const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 1000);
-        const deviceId = req.query.deviceId;
+        const deviceId = normalizar(req.query.deviceId) || undefined;
         const select = `
             SELECT id, device_id, cpu_usage, cpu_speed_ghz, memory_usage, memory_total,
                 disk_usage, disk_total, ip_address, recorded_at

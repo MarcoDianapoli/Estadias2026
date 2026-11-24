@@ -4,6 +4,9 @@ import { apiFetch, socketOptions } from '../api.js';
 import { useAuth } from '../AuthContext.jsx';
 import useDialog from '../useDialog.js';
 import usePageMeta from '../usePageMeta.js';
+import {
+  codigo, etiqueta, normalizarCodigoSgl, PRIORIDADES,
+} from '../normalizacion.js';
 import AdminPanel from './AdminPanel.jsx';
 
 const USER_TABS = [
@@ -25,6 +28,10 @@ const ADMIN_TABS = [
 
 const ROLES = { usuario: 'Usuario', tecnico: 'Técnico', admin: 'Administrador' };
 
+function nombre(valor, porDefecto = 'sin nombre') {
+  return etiqueta(valor) || porDefecto;
+}
+
 function fecha(valor) {
   if (!valor) return '—';
   const fecha = new Date(String(valor).replace(' ', 'T'));
@@ -43,26 +50,26 @@ function mensajeError(err) {
 
 function EstadoBadge({ estado }) {
   const clase = {
-    Abierto: 'estado-abierto',
-    'En proceso': 'estado-proceso',
-    Resuelto: 'estado-resuelto',
-    Cerrado: 'estado-cerrado',
+    abierto: 'estado-abierto',
+    'en proceso': 'estado-proceso',
+    resuelto: 'estado-resuelto',
+    cerrado: 'estado-cerrado',
   }[estado] || 'estado-abierto';
-  return <span className={`ticket-badge ${clase}`}>{estado}</span>;
+  return <span className={`ticket-badge ${clase}`}>{etiqueta(estado)}</span>;
 }
 
 function PrioridadBadge({ prioridad }) {
   const clase = {
-    Alta: 'prioridad-alta',
-    Media: 'prioridad-media',
-    Baja: 'prioridad-baja',
+    alta: 'prioridad-alta',
+    media: 'prioridad-media',
+    baja: 'prioridad-baja',
   }[prioridad] || 'prioridad-media';
-  return <span className={`ticket-badge ${clase}`}>{prioridad}</span>;
+  return <span className={`ticket-badge ${clase}`}>{etiqueta(prioridad)}</span>;
 }
 
 function NewTicketModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
-    titulo: '', descripcion: '', prioridad: 'Media', categoria: '', codigo: '',
+    titulo: '', descripcion: '', prioridad: 'media', categoria: '', codigo: '',
   });
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -75,7 +82,7 @@ function NewTicketModal({ onClose, onCreated }) {
     try {
       const res = await apiFetch('/api/tickets', {
         method: 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, codigo: normalizarCodigoSgl(form.codigo) || '' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo registrar el ticket');
@@ -119,9 +126,7 @@ function NewTicketModal({ onClose, onCreated }) {
           <label>
             Prioridad
             <select value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: e.target.value })}>
-              <option>Baja</option>
-              <option>Media</option>
-              <option>Alta</option>
+              {PRIORIDADES.map((valor) => <option key={valor} value={valor}>{etiqueta(valor)}</option>)}
             </select>
           </label>
           <label>
@@ -170,7 +175,7 @@ export default function Tickets() {
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [prioridadEdicion, setPrioridadEdicion] = useState('Media');
+  const [prioridadEdicion, setPrioridadEdicion] = useState('media');
   const [mensaje, setMensaje] = useState('');
   const [cargando, setCargando] = useState(true);
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
@@ -251,7 +256,7 @@ export default function Tickets() {
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
   useEffect(() => {
-    setPrioridadEdicion(detail?.prioridad || 'Media');
+    setPrioridadEdicion(detail?.prioridad || 'media');
   }, [detail?.id, detail?.prioridad]);
 
   useEffect(() => {
@@ -357,7 +362,7 @@ export default function Tickets() {
   }
 
   function eliminarTicket() {
-    if (!window.confirm(`¿Eliminar el ticket ${detail?.codigo || selectedId}? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`¿Eliminar el ticket ${codigo(detail?.codigo) || selectedId}? Esta acción no se puede deshacer.`)) return;
     ticketIgnoradoRef.current = Number(selectedId);
     ejecutarAccion(async () => {
       const res = await apiFetch(`/api/tickets/${selectedId}`, { method: 'DELETE' });
@@ -503,12 +508,12 @@ export default function Tickets() {
                       <EstadoBadge estado={ticket.estado} />
                     </span>
                     <span className="ticket-item-meta">
-                      <code>{ticket.codigo}</code>
+                      <code>{codigo(ticket.codigo)}</code>
                       <PrioridadBadge prioridad={ticket.prioridad} />
                       {ticket.mensajes_count > 0 && <span className="ticket-msg-count">{ticket.mensajes_count} mensajes</span>}
                     </span>
                     <span className="ticket-item-foot">
-                      {ticket.solicitante_nombre || 'Sin solicitante'} · {fecha(ticket.created_at)}
+                      {ticket.solicitante_nombre ? nombre(ticket.solicitante_nombre) : 'Sin solicitante'} · {fecha(ticket.created_at)}
                     </span>
                   </button>
                 </li>
@@ -532,9 +537,9 @@ export default function Tickets() {
             <>
               <div className="ticket-detail-head">
                 <div>
-                  <p className="ticket-code"><code>{detail.codigo}</code></p>
+                  <p className="ticket-code"><code>{codigo(detail.codigo)}</code></p>
                   <h2 id="ticket-detail-title">{detail.titulo}</h2>
-                  <p className="hint">Registrado por {detail.solicitante_nombre || 'sin solicitante'} · {fecha(detail.created_at)}</p>
+                  <p className="hint">Registrado por {nombre(detail.solicitante_nombre, 'sin solicitante')} · {fecha(detail.created_at)}</p>
                 </div>
                 <div className="ticket-detail-badges">
                   <EstadoBadge estado={detail.estado} />
@@ -545,25 +550,25 @@ export default function Tickets() {
               <p className="ticket-description">{detail.descripcion || 'Sin descripción.'}</p>
 
               <dl className="ticket-meta">
-                <div><dt>Categoría</dt><dd>{detail.categoria || 'General'}</dd></div>
-                <div><dt>Técnico</dt><dd>{detail.tecnico_nombre || 'Sin asignar'}</dd></div>
+                <div><dt>Categoría</dt><dd>{etiqueta(detail.categoria) || 'General'}</dd></div>
+                <div><dt>Técnico</dt><dd>{nombre(detail.tecnico_nombre, 'Sin asignar')}</dd></div>
                 <div><dt>Tomado</dt><dd>{fecha(detail.tomado_en)}</dd></div>
                 <div><dt>Cerrado</dt><dd>{fecha(detail.cerrado_en)}</dd></div>
               </dl>
 
-              {esStaff && detail.estado !== 'Cerrado' && (
+              {esStaff && detail.estado !== 'cerrado' && (
                 <div className="ticket-actions">
                   {!detail.tecnico_usuario_id && (
                     <button type="button" className="btn primary" onClick={tomarTicket} disabled={procesando}>
                       Tomar ticket
                     </button>
                   )}
-                  {detail.estado !== 'Resuelto' && (
-                    <button type="button" className="btn secondary" onClick={() => cambiarEstado('Resuelto')} disabled={procesando}>
+                  {detail.estado !== 'resuelto' && (
+                    <button type="button" className="btn secondary" onClick={() => cambiarEstado('resuelto')} disabled={procesando}>
                       Marcar resuelto
                     </button>
                   )}
-                  <button type="button" className="btn secondary" onClick={() => cambiarEstado('Cerrado')} disabled={procesando}>
+                  <button type="button" className="btn secondary" onClick={() => cambiarEstado('cerrado')} disabled={procesando}>
                     Cerrar ticket
                   </button>
                 </div>
@@ -574,9 +579,7 @@ export default function Tickets() {
                   <label>
                     Prioridad
                     <select value={prioridadEdicion} onChange={(e) => setPrioridadEdicion(e.target.value)}>
-                      <option>Baja</option>
-                      <option>Media</option>
-                      <option>Alta</option>
+                      {PRIORIDADES.map((valor) => <option key={valor} value={valor}>{etiqueta(valor)}</option>)}
                     </select>
                   </label>
                   <button type="button" className="detail-btn" onClick={guardarPrioridad} disabled={procesando}>
@@ -595,8 +598,8 @@ export default function Tickets() {
                     <ol className="timeline">
                       {detail.eventos.map((evento) => (
                         <li key={evento.id}>
-                          <strong>{evento.accion}</strong>
-                          <span>{evento.usuario_nombre ? ` · ${evento.usuario_nombre}` : ''}</span>
+                          <strong>{etiqueta(evento.accion)}</strong>
+                          <span>{evento.usuario_nombre ? ` · ${nombre(evento.usuario_nombre)}` : ''}</span>
                           <small>{evento.detalle ? `${evento.detalle} · ` : ''}{fecha(evento.creado_en)}</small>
                         </li>
                       ))}
@@ -614,15 +617,15 @@ export default function Tickets() {
                     ) : messages.map((item) => (
                       <article key={item.id} className={`chat-bubble${item.usuario_id === user.id ? ' propio' : ''}`}>
                         <header>
-                          <strong>{item.usuario_nombre}</strong>
-                          <small>{ROLES[item.usuario_rol] || item.usuario_rol} · {fecha(item.creado_en)}</small>
+                          <strong>{nombre(item.usuario_nombre)}</strong>
+                          <small>{ROLES[item.usuario_rol] || etiqueta(item.usuario_rol)} · {fecha(item.creado_en)}</small>
                         </header>
                         <p>{item.mensaje}</p>
                       </article>
                     ))}
                   </div>
 
-                  {detail.estado !== 'Cerrado' && (
+                  {detail.estado !== 'cerrado' && (
                     <form className="chat-form" onSubmit={enviarMensaje}>
                       <label className="sr-only" htmlFor="mensaje-ticket">Mensaje</label>
                       <textarea

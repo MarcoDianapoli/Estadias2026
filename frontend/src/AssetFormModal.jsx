@@ -1,6 +1,9 @@
 import { useId, useState } from 'react';
 import { FAMILIES, parseFamilias } from './families';
 import { apiFetch } from './api.js';
+import {
+  codigo, etiqueta, identificador, normalizarCodigoSgl, normalizarEntrada,
+} from './normalizacion.js';
 import useDialog from './useDialog';
 
 export const emptyAssetForm = {
@@ -25,22 +28,22 @@ export const emptyAssetForm = {
 
 export function assetToForm(asset) {
   return {
-    codigo: asset.codigo || '',
+    codigo: codigo(asset.codigo),
     deviceId: asset.device_id || '',
-    tipo: asset.tipo || '',
+    tipo: etiqueta(asset.tipo),
     familias: parseFamilias(asset.familias),
-    marca: asset.marca || '',
-    modelo: asset.modelo || '',
-    numeroSerie: asset.numero_serie || '',
-    hostname: asset.hostname || '',
+    marca: etiqueta(asset.marca),
+    modelo: etiqueta(asset.modelo),
+    numeroSerie: identificador(asset.numero_serie),
+    hostname: identificador(asset.hostname),
     ipAddress: asset.ip_address || '',
-    correo: asset.correo || '',
-    vnc: asset.vnc || '',
+    correo: etiqueta(asset.correo),
+    vnc: identificador(asset.vnc),
     password: asset.password || '',
     adminPassword: asset.adminPassword || '',
     rustdeskPassword: asset.rustdeskPassword || '',
-    ubicacion: asset.ubicacion || '',
-    responsable: asset.responsable || '',
+    ubicacion: etiqueta(asset.ubicacion),
+    responsable: etiqueta(asset.responsable),
     notas: asset.notas || '',
   };
 }
@@ -84,7 +87,20 @@ export default function AssetFormModal({
     try {
       const res = await apiFetch(asset ? `/api/assets/${asset.id}` : '/api/assets', {
         method: asset ? 'PUT' : 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          codigo: normalizarCodigoSgl(form.codigo) || '',
+          deviceId: normalizarEntrada(form.deviceId),
+          tipo: normalizarEntrada(form.tipo) || 'equipo',
+          marca: normalizarEntrada(form.marca),
+          modelo: normalizarEntrada(form.modelo),
+          numeroSerie: normalizarEntrada(form.numeroSerie),
+          hostname: normalizarEntrada(form.hostname),
+          correo: normalizarEntrada(form.correo),
+          vnc: normalizarEntrada(form.vnc),
+          ubicacion: normalizarEntrada(form.ubicacion),
+          responsable: normalizarEntrada(form.responsable),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar');
@@ -119,24 +135,24 @@ export default function AssetFormModal({
         <h3 id={titleId}>{asset ? 'Editar equipo' : 'Registrar equipo'}</h3>
         <p className="modal-sub">
           {asset
-            ? `Modificando ${form.codigo}. Las contraseñas se vuelven a cifrar al guardar.`
-            : 'Si dejas el código vacío se asigna el siguiente SGL-0000 disponible.'}
+            ? `Modificando ${codigo(form.codigo)}. Las contraseñas se vuelven a cifrar al guardar.`
+            : 'Si dejas el código vacío se asigna el siguiente sgl-0000 disponible.'}
         </p>
         {!asset && form.deviceId && (
           <p className="modal-hint">
-            Al guardar, el agente <strong>{form.deviceId}</strong> quedará vinculado automáticamente a este equipo.
+            Al guardar, el agente <strong>{identificador(form.deviceId)}</strong> quedará vinculado automáticamente a este equipo.
           </p>
         )}
         {error && <p className="alerts critical" role="alert">{error}</p>}
         <form className="asset-form" onSubmit={submit}>
-          <label>Código SGL<input name="codigo" value={form.codigo} onChange={change} placeholder="SGL-0123 (opcional)" /></label>
+          <label>Código SGL<input name="codigo" value={form.codigo} onChange={change} placeholder="sgl-0123 (opcional)" /></label>
           <label>Tipo<input name="tipo" value={form.tipo} onChange={change} placeholder="Laptop, Computadora…" /></label>
           <label>Equipo monitoreado
             <select name="deviceId" value={form.deviceId} onChange={change}>
               <option value="">Sin vincular</option>
               {opciones.map((d) => (
                 <option key={d.device_id} value={d.device_id}>
-                  {d.hostname || d.device_id} · {d.ip_address || 'sin IP'}
+                  {identificador(d.hostname || d.device_id)} · {d.ip_address || 'sin IP'}
                 </option>
               ))}
             </select>

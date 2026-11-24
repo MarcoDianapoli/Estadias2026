@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db');
+const { normalizar } = require('../normalizacion');
 
 const router = express.Router();
 const SESSION_HOURS = Number(process.env.TICKET_SESSION_HOURS) || 12;
@@ -14,7 +15,7 @@ function hashPin(pin, salt = crypto.randomBytes(16).toString('hex')) {
 }
 
 function safeUser(user) {
-  return { id: user.id, nombre: user.nombre, rol: user.rol };
+  return { id: user.id, nombre: normalizar(user.nombre) || user.nombre, rol: user.rol };
 }
 
 function parseToken(header) {
@@ -60,7 +61,7 @@ function requireRole(...roles) {
 }
 
 router.post('/login', async (req, res) => {
-  const nombre = String(req.body?.nombre || '').trim();
+  const nombre = normalizar(req.body?.nombre) || '';
   const pin = String(req.body?.pin || '').trim();
   if (!nombre || !pin) return res.status(400).json({ error: 'Escribe tu usuario y PIN' });
 
@@ -110,7 +111,7 @@ router.get('/users', requireAuth, requireRole('admin'), async (_req, res) => {
 });
 
 router.post('/users', requireAuth, requireRole('admin'), async (req, res) => {
-  const nombre = String(req.body?.nombre || '').trim();
+  const nombre = normalizar(req.body?.nombre) || '';
   const pin = String(req.body?.pin || '').trim();
   const rol = String(req.body?.rol || 'usuario');
   if (!nombre || pin.length < 4 || !ROLES.includes(rol)) {
@@ -132,7 +133,7 @@ router.post('/users', requireAuth, requireRole('admin'), async (req, res) => {
 
 router.patch('/users/:id', requireAuth, requireRole('admin'), async (req, res) => {
   const id = Number(req.params.id);
-  const nombre = String(req.body?.nombre || '').trim();
+  const nombre = normalizar(req.body?.nombre) || '';
   const rol = String(req.body?.rol || '');
   const activo = req.body?.activo === undefined ? undefined : Number(Boolean(req.body.activo));
   if (!id || !nombre || !ROLES.includes(rol) || (activo !== undefined && ![0, 1].includes(activo))) {

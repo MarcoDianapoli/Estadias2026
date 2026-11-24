@@ -7,6 +7,9 @@ import { apiFetch } from './api.js';
 import { createAsset as createLaptop } from './laptop-e775ba.mjs';
 import { createAsset as createCpu } from './cpu-e775ba.mjs';
 import { familiaCantidad } from './families';
+import {
+  codigo, etiqueta, identificador, normalizarEntrada,
+} from './normalizacion.js';
 import usePageMeta from './usePageMeta';
 
 function Modelo({ fabrica, codigo }) {
@@ -34,17 +37,17 @@ function Modelo({ fabrica, codigo }) {
 function ModeloEquipo({ asset, esCpu }) {
   return (
     <aside className="ficha-modelo" data-modelo={esCpu ? 'cpu' : 'laptop'}>
-      <div className="modelo-canvas" role="img" aria-label={`Modelo 3D representativo de ${asset.codigo}`}>
+      <div className="modelo-canvas" role="img" aria-label={`Modelo 3D representativo de ${codigo(asset.codigo)}`}>
         <Canvas camera={{ position: [3, 3, 4] }} shadows dpr={[1, 2]}>
           <hemisphereLight args={[0xffffff, 0x998877, 1.2]} />
           <directionalLight position={[4, 7, 5]} intensity={2} castShadow />
-          <Modelo fabrica={esCpu ? createCpu : createLaptop} codigo={asset.codigo} />
+          <Modelo fabrica={esCpu ? createCpu : createLaptop} codigo={codigo(asset.codigo)} />
         </Canvas>
       </div>
       <img
         className="modelo-qr"
         src={`/api/assets/${asset.id}/qr`}
-        alt={`QR de ${asset.codigo}`}
+        alt={`QR de ${codigo(asset.codigo)}`}
       />
     </aside>
   );
@@ -65,7 +68,7 @@ export default function Ficha({ token: tokenProp }) {
   const [commentError, setCommentError] = useState('');
 
   usePageMeta(
-    asset ? `Ficha ${asset.codigo}` : 'Ficha del equipo',
+    asset ? `Ficha ${codigo(asset.codigo)}` : 'Ficha del equipo',
     'Datos, credenciales, QR y comentarios de un equipo del inventario Loganmex.',
   );
   const cerrarEdicion = () => setEditing(false);
@@ -106,7 +109,7 @@ export default function Ficha({ token: tokenProp }) {
   const guardado = (data) => {
     setAsset(data);
     setEditing(false);
-    setNotice(`${data.codigo} actualizado correctamente`);
+    setNotice(`${codigo(data.codigo)} actualizado correctamente`);
   };
 
   const enviarComentario = async (event) => {
@@ -120,7 +123,7 @@ export default function Ficha({ token: tokenProp }) {
       const res = await apiFetch(`/api/assets/${asset.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ autor: commentAuthor, comentario: texto }),
+        body: JSON.stringify({ autor: normalizarEntrada(commentAuthor), comentario: texto }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo guardar el comentario');
@@ -161,19 +164,19 @@ export default function Ficha({ token: tokenProp }) {
   const conModelo = esLaptop || esCpu;
 
   const rows = [
-    ['Código', asset.codigo],
-    ['Tipo', asset.tipo],
+    ['Código', codigo(asset.codigo)],
+    ['Tipo', etiqueta(asset.tipo)],
     ['Familias', ''],
-    ['Marca', asset.marca],
-    ['Modelo', asset.modelo],
-    ['N.º de serie', asset.numero_serie],
-    ['Usuario', asset.responsable],
-    ['Departamento', asset.ubicacion],
+    ['Marca', etiqueta(asset.marca)],
+    ['Modelo', etiqueta(asset.modelo)],
+    ['N.º de serie', identificador(asset.numero_serie)],
+    ['Usuario', etiqueta(asset.responsable)],
+    ['Departamento', etiqueta(asset.ubicacion)],
     ['Dirección IP', asset.ip_address],
-    ['Correo', asset.correo],
-    ['VNC', asset.vnc],
-    ['Hostname', asset.hostname || asset.device_hostname],
-    ['Agente vinculado', asset.device_id || 'Sin vincular'],
+    ['Correo', etiqueta(asset.correo)],
+    ['VNC', identificador(asset.vnc)],
+    ['Hostname', identificador(asset.hostname || asset.device_hostname)],
+    ['Agente vinculado', identificador(asset.device_id) || 'Sin vincular'],
     ['Contraseña', asset.password],
     ['Contraseña de administrador', asset.adminPassword],
     ['Contraseña RustDesk', asset.rustdeskPassword],
@@ -198,11 +201,11 @@ export default function Ficha({ token: tokenProp }) {
         {notice && <p className="alerts ok" role="status">{notice}</p>}
 
         <div className="ficha-print" aria-hidden="true">
-          <strong className="print-code">{asset.codigo}</strong>
-          <img src={`/api/assets/${asset.id}/qr`} alt={`QR de ${asset.codigo}`} />
+          <strong className="print-code">{codigo(asset.codigo)}</strong>
+          <img src={`/api/assets/${asset.id}/qr`} alt={`QR de ${codigo(asset.codigo)}`} />
         </div>
 
-        <h2>{asset.codigo} · {[asset.marca, asset.modelo].filter(Boolean).join(' ') || asset.tipo}</h2>
+        <h2>{codigo(asset.codigo)} · {[etiqueta(asset.marca), etiqueta(asset.modelo)].filter(Boolean).join(' ') || etiqueta(asset.tipo)}</h2>
 
         <div className="ficha-body">
           <div className="detail-grid ficha-grid">
@@ -233,7 +236,7 @@ export default function Ficha({ token: tokenProp }) {
               {comments.map((c) => (
                 <article key={c.id} className="comentario">
                   <header>
-                    <strong>{c.autor || 'Anónimo'}</strong>
+                    <strong>{etiqueta(c.autor) || 'Anónimo'}</strong>
                     <time>{fechaComentario(c.created_at)}</time>
                   </header>
                   <p>{c.comentario}</p>

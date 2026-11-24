@@ -1,10 +1,11 @@
 const express = require('express');
 const pool = require('../db');
 const { requireRole } = require('./auth');
+const { normalizar, normalizarCodigoTicket } = require('../normalizacion');
 
 const router = express.Router();
-const STATUSES = ['Abierto', 'En proceso', 'Resuelto', 'Cerrado'];
-const PRIORITIES = ['Baja', 'Media', 'Alta'];
+const STATUSES = ['abierto', 'en proceso', 'resuelto', 'cerrado'];
+const PRIORITIES = ['baja', 'media', 'alta'];
 
 const TICKET_SELECT = `
   SELECT t.id, t.codigo, t.titulo, t.descripcion, t.estado, t.prioridad, t.categoria,
@@ -96,15 +97,15 @@ function scopeSql(user, scope) {
   if (scope === 'mine' || scope === 'mios-pendientes' || scope === 'mios-cerrados') {
     where = 'WHERE t.solicitante_usuario_id = ?';
     params.push(user.id);
-    if (scope === 'mios-pendientes') where += " AND t.estado <> 'Cerrado'";
-    if (scope === 'mios-cerrados') where += " AND t.estado = 'Cerrado'";
+    if (scope === 'mios-pendientes') where += " AND t.estado <> 'cerrado'";
+    if (scope === 'mios-cerrados') where += " AND t.estado = 'cerrado'";
   } else if (scope === 'generales') {
-    where = "WHERE t.estado = 'Abierto' AND t.tecnico_usuario_id IS NULL";
+    where = "WHERE t.estado = 'abierto' AND t.tecnico_usuario_id IS NULL";
   } else if (scope === 'tomados') {
-    where = "WHERE t.tecnico_usuario_id = ? AND t.estado <> 'Cerrado'";
+    where = "WHERE t.tecnico_usuario_id = ? AND t.estado <> 'cerrado'";
     params.push(user.id);
   } else if (scope === 'cerrados') {
-    where = "WHERE t.estado = 'Cerrado'";
+    where = "WHERE t.estado = 'cerrado'";
   } else if (scope === 'chat') {
     where = `WHERE EXISTS (
       SELECT 1 FROM ticket_messages m
@@ -123,8 +124,8 @@ router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.execute(
       `${TICKET_SELECT} ${where} ORDER BY
-        FIELD(t.estado, 'Abierto', 'En proceso', 'Resuelto', 'Cerrado'),
-        FIELD(t.prioridad, 'Alta', 'Media', 'Baja'),
+        FIELD(t.estado, 'abierto', 'en proceso', 'resuelto', 'cerrado'),
+        FIELD(t.prioridad, 'alta', 'media', 'baja'),
         t.created_at DESC, t.id DESC
        LIMIT 300`,
       params,
@@ -140,9 +141,9 @@ router.get('/stats', requireRole('tecnico', 'admin'), async (_req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT COUNT(*) AS total,
-             SUM(estado = 'Abierto' AND tecnico_usuario_id IS NULL) AS generales,
-             SUM(estado <> 'Cerrado' AND tecnico_usuario_id IS NOT NULL) AS tomados,
-             SUM(estado = 'Cerrado') AS cerrados
+             SUM(estado = 'abierto' AND tecnico_usuario_id IS NULL) AS generales,
+             SUM(estado <> 'cerrado' AND tecnico_usuario_id IS NOT NULL) AS tomados,
+             SUM(estado = 'cerrado') AS cerrados
         FROM tickets
     `);
     const row = rows[0] || {};
@@ -182,9 +183,10 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const titulo = clean(req.body?.titulo, 180);
   const descripcion = clean(req.body?.descripcion, 5000);
-  const prioridad = PRIORITIES.includes(req.body?.prioridad) ? req.body.prioridad : 'Media';
-  const categoria = clean(req.body?.categoria, 60) || null;
-  const codigo = clean(req.body?.codigo, 32) || null;
+  const prioridadNormalizada = normalizar(req.body?.prioridad);
+  const prioridad = PRIORITIES.includes(prioridadNormalizada) ? prioridadNormalizada : 'media';
+  const categoria = normalizar(req.body?.categoria)?.slice(0, 60) || null;
+  const codigo = normalizarCodigoTicket(req.body?.codigo)?.slice(0, 32) || null;
 
   if (titulo.length < 3) return res.status(400).json({ error: 'Escribe un título de al menos 3 caracteres' });
 
@@ -192,11 +194,11 @@ router.post('/', async (req, res) => {
     const [result] = await pool.execute(
       `INSERT INTO tickets
         (codigo, categoria, titulo, descripcion, estado, prioridad, responsable, solicitante_usuario_id)
-       VALUES (?, ?, ?, ?, 'Abierto', ?, ?, ?)`,
-      [codigo, categoria, titulo, descripcion || null, prioridad, req.user.nombre, req.user.id],
+       VALUES (?, ?, ?, ?, 'abierto', ?, ?, ?)`,
+      [codigo, categoria, titulo, descripcion || null, prioridad, normalizar(req.user.nombre), req.user.id],
     );
 
-    const ticketCode = `TKT-${new Date().getFullYear()}-${String(result.insertId).padStart(5, '0')}`;
+    const ticketCode = `tkt-${new Date().getFullYear()}-${String(result.insertId).padStart(5, '0')}`;
     await pool.execute('UPDATE tickets SET codigo = ? WHERE id = ? AND codigo IS NULL', [ticketCode, result.insertId]);
     await logEvent(result.insertId, req.user.id, 'creado', 'Ticket registrado desde la consola local');
 
@@ -220,7 +222,7 @@ router.patch('/:id/take', requireRole('tecnico', 'admin'), async (req, res) => {
     if (tecnicoId !== req.user.id && req.user.rol !== 'admin') {
       return res.status(403).json({ error: 'Solo puedes tomar tickets para ti' });
     }
-    if (ticket.estado === 'Cerrado') return res.status(409).json({ error: 'El ticket ya está cerrado' });
+    if (ticket.estado === 'cerrado') return res.status(409).json({ error: 'El ticket ya está cerrado' });
     if (ticket.tecnico_usuario_id && tecnicoId === ticket.tecnico_usuario_id) {
       return res.status(409).json({ error: 'Ya tienes tomado este ticket' });
     }
@@ -231,25 +233,26 @@ router.patch('/:id/take', requireRole('tecnico', 'admin'), async (req, res) => {
     const [techRows] = await pool.execute('SELECT nombre FROM ticket_users WHERE id = ? AND activo = 1', [tecnicoId]);
     if (!techRows.length) return res.status(400).json({ error: 'El técnico indicado no existe o está inactivo' });
 
+    const nombreTecnico = normalizar(techRows[0].nombre);
     await pool.execute(
       `UPDATE tickets
-          SET tecnico_usuario_id = ?, estado = 'En proceso', tomado_en = NOW(),
+          SET tecnico_usuario_id = ?, estado = 'en proceso', tomado_en = NOW(),
               resuelto_en = NULL, cerrado_en = NULL, responsable = ?
         WHERE id = ?`,
-      [tecnicoId, techRows[0].nombre, ticket.id],
+      [tecnicoId, nombreTecnico, ticket.id],
     );
     await logEvent(
       ticket.id,
       req.user.id,
       tecnicoId === req.user.id ? 'tomado' : 'asignado',
-      `Atendido por ${techRows[0].nombre}`,
+      `Atendido por ${nombreTecnico}`,
     );
 
     const updated = await findTicket(ticket.id);
     emit(req, 'tickets:update', {
       ...resumenTicket(updated),
       accion: 'tomado',
-      tecnico_nombre: techRows[0].nombre,
+      tecnico_nombre: nombreTecnico,
       actor: actor(req),
     }, { solicitante: true });
     res.json(updated);
@@ -260,7 +263,7 @@ router.patch('/:id/take', requireRole('tecnico', 'admin'), async (req, res) => {
 });
 
 router.patch('/:id/status', requireRole('tecnico', 'admin'), async (req, res) => {
-  const estado = String(req.body?.estado || '');
+  const estado = normalizar(req.body?.estado) || '';
   if (!STATUSES.includes(estado)) return res.status(400).json({ error: 'Estado no válido' });
 
   try {
@@ -270,8 +273,8 @@ router.patch('/:id/status', requireRole('tecnico', 'admin'), async (req, res) =>
     await pool.execute(
       `UPDATE tickets
           SET estado = ?,
-              resuelto_en = IF(? IN ('Resuelto', 'Cerrado'), COALESCE(resuelto_en, NOW()), NULL),
-              cerrado_en = IF(? = 'Cerrado', COALESCE(cerrado_en, NOW()), NULL)
+              resuelto_en = IF(? IN ('resuelto', 'cerrado'), COALESCE(resuelto_en, NOW()), NULL),
+              cerrado_en = IF(? = 'cerrado', COALESCE(cerrado_en, NOW()), NULL)
         WHERE id = ?`,
       [estado, estado, estado, ticket.id],
     );
@@ -349,9 +352,9 @@ router.patch('/:id', requireRole('admin'), async (req, res) => {
   const allowed = {
     titulo: (v) => clean(v, 180),
     descripcion: (v) => clean(v, 5000),
-    prioridad: (v) => (PRIORITIES.includes(v) ? v : null),
-    categoria: (v) => clean(v, 60) || null,
-    responsable: (v) => clean(v, 128) || null,
+    prioridad: (v) => (PRIORITIES.includes(normalizar(v)) ? normalizar(v) : null),
+    categoria: (v) => normalizar(v)?.slice(0, 60) || null,
+    responsable: (v) => normalizar(v)?.slice(0, 128) || null,
   };
 
   for (const [key, normalize] of Object.entries(allowed)) {

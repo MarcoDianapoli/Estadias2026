@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from './AuthContext.jsx';
+import { normalizarEntrada } from './normalizacion.js';
 import usePageMeta from './usePageMeta.js';
 
 export default function Login() {
@@ -16,7 +17,7 @@ export default function Login() {
     setError('');
     setEnviando(true);
     try {
-      await login(nombre.trim(), pin.trim());
+      await login(normalizarEntrada(nombre), pin.trim());
     } catch (err) {
       setError(err.message);
     } finally {
