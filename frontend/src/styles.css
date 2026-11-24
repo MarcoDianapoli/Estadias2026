@@ -557,6 +557,12 @@ code { background: #e2e8f0; padding: 1px 5px; border-radius: 4px; font-size: 12p
   border: 1px solid rgba(255, 255, 255, .16);
   background: rgba(255, 255, 255, .07);
 }
+.session-trigger {
+  cursor: pointer; color: inherit; font: inherit; text-align: left;
+  transition: background .15s ease, border-color .15s ease;
+}
+.session-trigger:hover { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .3); }
+.session-chevron { width: 14px; height: 14px; color: #cbd5e1; flex: none; }
 .session-avatar {
   display: grid; place-items: center; width: 30px; height: 30px;
   border-radius: 8px; background: #2563eb; color: #fff;
@@ -571,6 +577,78 @@ code { background: #e2e8f0; padding: 1px 5px; border-radius: 4px; font-size: 12p
   background: transparent; color: #e2e8f0; font: inherit; font-size: 11px;
 }
 .session-logout:hover { background: rgba(255, 255, 255, .14); }
+
+/* Menú lateral de usuario (drawer) */
+.drawer-root { position: fixed; inset: 0; z-index: 80; }
+.drawer-backdrop {
+  position: absolute; inset: 0; background: rgba(15, 23, 42, .55);
+  animation: lm-fade-in .18s ease both;
+}
+.drawer-panel {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  width: min(340px, 90vw); display: flex; flex-direction: column;
+  background: #fff; color: #0f172a; box-shadow: 8px 0 40px rgba(15, 23, 42, .35);
+  animation: lm-drawer-in .22s ease both;
+}
+@keyframes lm-drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+.drawer-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 18px 16px; background: #0f172a; color: #f8fafc;
+}
+.drawer-user { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.drawer-user > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.drawer-user strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawer-user small { color: #cbd5e1; font-size: 11px; }
+.drawer-close {
+  display: grid; place-items: center; flex: none;
+  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .2); background: transparent; color: #e2e8f0;
+}
+.drawer-close:hover { background: rgba(255, 255, 255, .14); }
+.drawer-close svg { width: 16px; height: 16px; }
+.drawer-nav { flex: 1; overflow-y: auto; padding: 10px; display: grid; gap: 4px; align-content: start; }
+.drawer-link {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px; border: 0; border-radius: 10px; background: transparent;
+  color: #334155; font: inherit; text-align: left; cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.drawer-link:hover { background: #eff6ff; color: #1d4ed8; }
+.drawer-link svg { width: 20px; height: 20px; flex: none; color: #2563eb; }
+.drawer-link > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.drawer-link strong { font-size: 13px; }
+.drawer-link small { color: #64748b; font-size: 11px; }
+.drawer-link-admin { border-top: 1px solid #e2e8f0; margin-top: 6px; border-radius: 0 0 10px 10px; padding-top: 14px; }
+.drawer-foot { padding: 12px 16px 18px; border-top: 1px solid #e2e8f0; }
+.drawer-config-link {
+  display: block; text-align: center; padding: 10px; border-radius: 8px;
+  background: #2563eb; color: #fff; text-decoration: none; font-size: 13px; font-weight: 600;
+}
+.drawer-config-link:hover { background: #1d4ed8; }
+
+/* Página de configuración */
+.config-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.config-admin { grid-column: 1 / -1; }
+.config-detalles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.config-detalles div { padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+.config-detalles dt { color: #64748b; font-size: 12px; }
+.config-detalles dd { margin: 4px 0 0; font-size: 14px; font-weight: 600; }
+.config-form { display: grid; gap: 12px; }
+.config-form label { display: grid; gap: 5px; font-size: 13px; color: #334155; font-weight: 600; }
+.config-form input {
+  width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px;
+  font: inherit; font-size: 14px; background: #fff;
+}
+.config-form .btn { justify-self: start; margin-top: 2px; }
+.config-toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.config-toggle-row strong { font-size: 14px; }
+.config-toggle-row .hint { margin: 4px 0 0; }
+.config-toggle { flex: none; }
+.config-panel { scroll-margin-top: 84px; }
+.config-admin { scroll-margin-top: 84px; }
 
 /* Tickets */
 .ticket-stats { margin-bottom: 16px; }
@@ -748,6 +826,9 @@ code { background: #e2e8f0; padding: 1px 5px; border-radius: 4px; font-size: 12p
   .modelo-canvas { height: 220px; }
   .comentario-form { grid-template-columns: 1fr; }
   .session-info { display: none; }
+  .config-layout, .config-detalles { grid-template-columns: minmax(0, 1fr); }
+  .config-toggle-row { flex-direction: column; align-items: stretch; }
+  .config-toggle { width: 100%; }
   .tickets-grid, .ticket-detail-sections, .admin-grid { grid-template-columns: minmax(0, 1fr); }
   .ticket-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chat-form { flex-direction: column; align-items: stretch; }

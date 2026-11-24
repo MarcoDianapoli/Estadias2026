@@ -8,6 +8,7 @@ import Inventario from './Inventario.jsx';
 import Ficha from './Ficha.jsx';
 import Mantenimiento from './Mantenimiento.jsx';
 import Tickets from './tickets/Tickets.jsx';
+import Configuracion from './Configuracion.jsx';
 
 function LegacyFicha() {
   const [params] = useSearchParams();
@@ -51,6 +52,7 @@ function AppShell() {
         <Route path="/ficha" element={soloStaff(<Ficha />)} />
         <Route path="/inventario.html" element={soloStaff(<LegacyFicha />)} />
         <Route path="/tickets" element={<Tickets />} />
+        <Route path="/configuracion" element={<Configuracion />} />
 
         <Route path="/mantenimiento" element={soloStaff(<Mantenimiento />)} />
 

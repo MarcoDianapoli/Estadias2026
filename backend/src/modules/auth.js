@@ -105,6 +105,41 @@ router.post('/logout', requireAuth, async (req, res) => {
 
 router.get('/me', requireAuth, (req, res) => res.json({ user: safeUser(req.user) }));
 
+// Cambio de PIN del propio usuario (cualquier rol). Nunca se devuelve ni guarda en texto.
+router.post('/me/pin', requireAuth, async (req, res) => {
+  const pin = String(req.body?.pin || '').trim();
+  const actual = String(req.body?.pinActual || '').trim();
+  if (pin.length < 4) return res.status(400).json({ error: 'PIN de al menos 4 caracteres' });
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT pin_salt, pin_hash FROM ticket_users WHERE id = ?',
+      [req.user.id],
+    );
+    const user = rows[0];
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    if (actual) {
+      const candidato = crypto.scryptSync(actual, user.pin_salt, 32).toString('hex');
+      const valido = crypto.timingSafeEqual(
+        Buffer.from(candidato, 'hex'),
+        Buffer.from(user.pin_hash, 'hex'),
+      );
+      if (!valido) return res.status(401).json({ error: 'El PIN actual es incorrecto' });
+    }
+
+    const pinData = hashPin(pin);
+    await pool.query(
+      'UPDATE ticket_users SET pin_salt = ?, pin_hash = ? WHERE id = ?',
+      [pinData.salt, pinData.hash, req.user.id],
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/auth/me/pin:', err.message);
+    res.status(500).json({ error: 'Error al actualizar el PIN' });
+  }
+});
+
 router.get('/users', requireAuth, requireRole('admin'), async (_req, res) => {
   const [rows] = await pool.query('SELECT id, nombre, rol, activo, creado_en FROM ticket_users ORDER BY nombre');
   res.json(rows);

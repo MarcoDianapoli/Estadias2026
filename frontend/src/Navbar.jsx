@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import NotificationBell from './NotificationBell.jsx';
+import UserMenu from './UserMenu.jsx';
 import { useAuth } from './AuthContext.jsx';
-import { etiqueta } from './normalizacion.js';
 
 const icons = {
   dashboard: (
@@ -47,10 +47,8 @@ const links = [
   { to: '/mantenimiento', label: 'Mantenimiento', icon: 'mantenimiento' },
 ];
 
-const ROLES = { usuario: 'Usuario', tecnico: 'Técnico', admin: 'Administrador' };
-
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const esUsuario = user.rol === 'usuario';
   const enlaces = esUsuario ? links.filter((link) => link.to === '/tickets') : links;
   const inicio = esUsuario ? '/tickets' : '/';
@@ -83,18 +81,7 @@ export default function Navbar() {
             ))}
           </div>
           <NotificationBell />
-          <div className="session-chip" aria-label={`Sesión de ${etiqueta(user.nombre)}`}>
-            <span className="session-avatar" aria-hidden="true">
-              {etiqueta(user.nombre).slice(0, 1).toUpperCase()}
-            </span>
-            <span className="session-info">
-              <strong>{etiqueta(user.nombre)}</strong>
-              <small>{ROLES[user.rol] || etiqueta(user.rol)}</small>
-            </span>
-            <button type="button" className="session-logout" onClick={logout} title="Cerrar sesión">
-              Salir
-            </button>
-          </div>
+          <UserMenu />
         </div>
       </div>
     </nav>
