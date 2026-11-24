@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { Navigate, Route, Routes, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext.jsx';
-import Navbar from './Navbar.jsx';
+import Sidebar from './Sidebar.jsx';
 import Login from './Login.jsx';
 import Dashboard from './Dashboard.jsx';
 import Monitoreo from './Monitoreo.jsx';
@@ -23,6 +24,7 @@ function LegacyFicha() {
 
 function AppShell() {
   const { user, loading } = useAuth();
+  const [menuExpandido, setMenuExpandido] = useState(false);
 
   if (loading) {
     return (
@@ -43,21 +45,25 @@ function AppShell() {
 
   return (
     <>
-      <Navbar />
+      <Sidebar
+        expandido={menuExpandido}
+        onToggle={() => setMenuExpandido((valor) => !valor)}
+      />
+      <div className={`contenido-app${menuExpandido ? ' sidebar-abierta' : ''}`}>
+        <Routes>
+          <Route path="/" element={soloStaff(<Dashboard />)} />
+          <Route path="/monitoreo" element={soloStaff(<Monitoreo />)} />
+          <Route path="/inventario" element={soloStaff(<Inventario />)} />
+          <Route path="/ficha" element={soloStaff(<Ficha />)} />
+          <Route path="/inventario.html" element={soloStaff(<LegacyFicha />)} />
+          <Route path="/tickets" element={<Tickets />} />
+          <Route path="/configuracion" element={<Configuracion />} />
 
-      <Routes>
-        <Route path="/" element={soloStaff(<Dashboard />)} />
-        <Route path="/monitoreo" element={soloStaff(<Monitoreo />)} />
-        <Route path="/inventario" element={soloStaff(<Inventario />)} />
-        <Route path="/ficha" element={soloStaff(<Ficha />)} />
-        <Route path="/inventario.html" element={soloStaff(<LegacyFicha />)} />
-        <Route path="/tickets" element={<Tickets />} />
-        <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/mantenimiento" element={soloStaff(<Mantenimiento />)} />
 
-        <Route path="/mantenimiento" element={soloStaff(<Mantenimiento />)} />
-
-        <Route path="*" element={<Navigate to={inicio} replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to={inicio} replace />} />
+        </Routes>
+      </div>
     </>
   );
 }
