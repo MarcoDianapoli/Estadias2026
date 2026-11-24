@@ -214,10 +214,7 @@ export default function Monitoreo() {
   return (
     <main className="app">
       <header className="header">
-        <div>
-          <h1>Monitoreo remoto de equipos</h1>
-          <p>Loganmex · agentes en campo · CPU, RAM, disco y estado en tiempo real</p>
-        </div>
+        <h1>Monitoreo remoto de equipos</h1>
         <Link className="detail-btn" to="/">Ir al panel general</Link>
       </header>
 

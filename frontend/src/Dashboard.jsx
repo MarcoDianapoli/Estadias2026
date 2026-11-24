@@ -126,10 +126,7 @@ export default function Dashboard() {
   return (
     <div className="app dashboard-page">
       <header className="header">
-        <div>
-          <h1>Panel general</h1>
-          <p>Loganmex · resumen de agentes, tickets y mantenimientos</p>
-        </div>
+        <h1>Panel general</h1>
       </header>
 
       <section className="panel">

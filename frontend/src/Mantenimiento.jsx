@@ -309,10 +309,7 @@ export default function Mantenimiento() {
   return (
     <main className="app">
       <header className="header">
-        <div>
-          <h1>Mantenimiento</h1>
-          <p>Agenda de mantenimiento preventivo y correctivo con código SGL, responsable y estatus.</p>
-        </div>
+        <h1>Mantenimiento</h1>
         <div className="header-actions">
           <button className="btn secondary" onClick={load} disabled={cargando || guardando}>Actualizar</button>
           <button className="btn primary" onClick={() => setFormAbierta({ orden: null })} disabled={guardando}>

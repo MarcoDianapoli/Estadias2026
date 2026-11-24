@@ -187,10 +187,7 @@ export default function Ficha({ token: tokenProp }) {
     <main className="app ficha-page">
       <section className={`panel ficha ${conModelo ? 'con-modelo' : ''}`}>
         <header className="header">
-          <div>
-            <h1>Ficha del equipo</h1>
-            <p>Loganmex · inventario electrónico</p>
-          </div>
+          <h1>Ficha del equipo</h1>
           <div className="header-actions">
             <button className="btn secondary" onClick={() => window.print()}>Imprimir código y QR</button>
             <button className="btn primary" onClick={() => setEditing(true)}>Editar equipo</button>

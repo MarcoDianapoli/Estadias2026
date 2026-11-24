@@ -366,10 +366,7 @@ export default function Inventario() {
   return (
     <main className="app">
       <header className="header">
-        <div>
-          <h1>Inventario electrónico</h1>
-          <p>Equipos SGL-0001 en adelante · códigos QR · contraseñas visibles y editables</p>
-        </div>
+        <h1>Inventario electrónico</h1>
         <div className="header-actions">
           <label className="btn secondary">
             {importing ? 'Importando…' : 'Importar Excel'}

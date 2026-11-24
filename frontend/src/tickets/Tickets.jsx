@@ -407,16 +407,7 @@ export default function Tickets() {
   return (
     <main className="app tickets-page">
       <header className="header">
-        <div>
-          <h1>Tickets</h1>
-          <p>
-            {esTecnico
-              ? 'Toma incidencias, da seguimiento y cierra sus atenciones.'
-              : esAdmin
-                ? 'Supervisa incidencias, accesos y el estado general del módulo.'
-                : 'Registra incidencias y consulta tus pendientes y cerrados.'}
-          </p>
-        </div>
+        <h1>Tickets</h1>
         <div className="header-actions">
           <button type="button" className="btn primary" onClick={() => setNuevoAbierto(true)}>
             Nuevo ticket

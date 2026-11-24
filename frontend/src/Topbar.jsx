@@ -13,14 +13,25 @@ const TITULOS = {
 };
 
 const SUBTITULOS = {
+  '/': 'Loganmex · resumen de agentes, tickets y mantenimientos',
+  '/monitoreo': 'Loganmex · agentes en campo · CPU, RAM, disco y estado en tiempo real',
+  '/inventario': 'Equipos SGL-0001 en adelante · códigos QR · contraseñas visibles y editables',
+  '/tickets': (rol) => (rol === 'tecnico'
+    ? 'Toma incidencias, da seguimiento y cierra sus atenciones.'
+    : rol === 'admin'
+      ? 'Supervisa incidencias, accesos y el estado general del módulo.'
+      : 'Registra incidencias y consulta tus pendientes y cerrados.'),
+  '/mantenimiento': 'Agenda de mantenimiento preventivo y correctivo con código SGL, responsable y estatus.',
   '/configuracion': 'Tu cuenta, seguridad y preferencias de la sesión local.',
+  '/ficha': 'Loganmex · inventario electrónico',
 };
 
 export default function Topbar({ onAbrirSidebar }) {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const titulo = TITULOS[pathname] || (pathname.startsWith('/ficha') ? 'Ficha' : 'Loganmex');
-  const subtitulo = SUBTITULOS[pathname];
+  const descripcion = SUBTITULOS[pathname];
+  const subtitulo = typeof descripcion === 'function' ? descripcion(user?.rol) : descripcion;
 
   return (
     <header className="topbar">
