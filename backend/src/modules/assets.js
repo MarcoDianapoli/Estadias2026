@@ -442,6 +442,53 @@ router.post('/:id/unlink', async (req, res) => {
   }
 });
 
+async function resumenMantenimiento(codigo) {
+  const sinMantenimiento = {
+    estatus: 'sin mantenimiento',
+    activa: null,
+    ultima: null,
+    total: 0,
+  };
+  if (!codigo) return sinMantenimiento;
+
+  try {
+    const [totales] = await pool.execute(
+      'SELECT COUNT(*) AS total FROM maintenance WHERE codigo = ?',
+      [codigo]
+    );
+    const [activas] = await pool.execute(
+      `SELECT id, actividad, tipo, fecha_programada, estatus, origen, anio_plan, ronda, semana
+         FROM maintenance
+        WHERE codigo = ? AND estatus IN ('pendiente', 'en proceso')
+        ORDER BY fecha_programada ASC, id ASC
+        LIMIT 1`,
+      [codigo]
+    );
+    const [ultimas] = await pool.execute(
+      `SELECT id, actividad, tipo, fecha_programada, estatus, origen, anio_plan, ronda, semana
+         FROM maintenance
+        WHERE codigo = ?
+        ORDER BY fecha_programada DESC, id DESC
+        LIMIT 1`,
+      [codigo]
+    );
+
+    if (!activas.length && !ultimas.length) return sinMantenimiento;
+
+    const activa = activas[0] || null;
+    const ultima = ultimas[0] || null;
+    return {
+      estatus: normalizar(activa?.estatus || ultima?.estatus || 'sin mantenimiento'),
+      activa,
+      ultima,
+      total: Number(totales[0]?.total) || 0,
+    };
+  } catch (err) {
+    console.error('resumenMantenimiento:', err.message);
+    return sinMantenimiento;
+  }
+}
+
 publicRouter.get('/token/:token', async (req, res) => {
   try {
     const [rows] = await pool.execute(
@@ -455,7 +502,9 @@ publicRouter.get('/token/:token', async (req, res) => {
 
     const sessionUser = await getUserFromToken(parseToken(req.headers.authorization));
     const esStaff = sessionUser && ['tecnico', 'admin'].includes(sessionUser.rol);
-    return res.json(esStaff ? withFicha(rows[0]) : publicFicha(rows[0]));
+    const ficha = esStaff ? withFicha(rows[0]) : publicFicha(rows[0]);
+    const mantenimiento = await resumenMantenimiento(rows[0].codigo);
+    return res.json({ ...ficha, mantenimiento });
   } catch (err) {
     console.error('GET /api/assets/token/:token:', err.message);
     return res.status(500).json({ error: 'Error al consultar la ficha' });

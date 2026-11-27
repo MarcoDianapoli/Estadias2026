@@ -23,8 +23,14 @@ CREATE TABLE IF NOT EXISTS maintenance (
     estatus ENUM('pendiente', 'en proceso', 'completado', 'cancelado') NOT NULL DEFAULT 'pendiente',
     responsable VARCHAR(128) DEFAULT NULL,
     observaciones TEXT DEFAULT NULL,
+    origen ENUM('manual', 'anual') NOT NULL DEFAULT 'manual',
+    anio_plan INT DEFAULT NULL,
+    ronda TINYINT DEFAULT NULL,
+    semana TINYINT DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
     PRIMARY KEY (id),
     KEY idx_maintenance_fecha (fecha_programada),
-    KEY idx_maintenance_estatus (estatus)
+    KEY idx_maintenance_estatus (estatus),
+    KEY idx_maintenance_plan (origen, anio_plan),
+    KEY idx_maintenance_ronda (anio_plan, ronda, semana)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

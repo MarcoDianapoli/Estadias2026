@@ -55,8 +55,20 @@ function currentWeekRange() {
 }
 
 // Rutas públicas: estado del servicio, agente de métricas, login y ficha/QR.
-app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, timestamp: new Date().toISOString() });
+app.get('/api/health', async (_req, res) => {
+    let db = { ok: false };
+    try {
+        await pool.query('SELECT 1');
+        db = { ok: true };
+    } catch (err) {
+        console.error('GET /api/health (BD):', err.message);
+        db = { ok: false, error: 'Sin respuesta' };
+    }
+    res.json({
+        ok: db.ok,
+        timestamp: new Date().toISOString(),
+        db,
+    });
 });
 
 app.post('/api/metrics', async (req, res) => {
@@ -205,6 +217,74 @@ app.get('/api/dashboard/summary', soloStaff, async (_req, res) => {
     } catch (err) {
         console.error('GET /api/dashboard/summary:', err.message);
         res.status(500).json({ error: 'Error al consultar el resumen' });
+    }
+});
+
+app.get('/api/dashboard/weekly', soloStaff, async (_req, res) => {
+    try {
+        const { inicio, fin } = currentWeekRange();
+        const base = new Date(inicio.replace(' ', 'T'));
+        const claves = Array.from({ length: 7 }, (_, i) => {
+            const dia = new Date(base);
+            dia.setDate(base.getDate() + i);
+            return `${dia.getFullYear()}-${String(dia.getMonth() + 1).padStart(2, '0')}-${String(dia.getDate()).padStart(2, '0')}`;
+        });
+
+        const conteoPorDia = async (columna, tabla, filtro = '') => {
+            const [rows] = await pool.execute(
+                `SELECT DATE_FORMAT(${columna}, '%Y-%m-%d') AS dia, COUNT(*) AS total
+                   FROM ${tabla}
+                  WHERE ${columna} >= ? AND ${columna} < ?${filtro}
+                  GROUP BY dia`,
+                [inicio, fin]
+            );
+            return new Map(rows.map((r) => [r.dia, Number(r.total) || 0]));
+        };
+
+        const [
+            ticketsCreados, ticketsTomados, ticketsResueltos, ticketsCerrados,
+            agentesDetectados, lecturasAgentes,
+            mantPendientes, mantEnProceso, mantCompletados, mantCancelados,
+        ] = await Promise.all([
+            conteoPorDia('created_at', 'tickets'),
+            conteoPorDia('tomado_en', 'tickets'),
+            conteoPorDia('resuelto_en', 'tickets'),
+            conteoPorDia('cerrado_en', 'tickets'),
+            conteoPorDia('created_at', 'devices'),
+            conteoPorDia('recorded_at', 'metrics'),
+            conteoPorDia('fecha_programada', 'maintenance', " AND estatus = 'pendiente'"),
+            conteoPorDia('fecha_programada', 'maintenance', " AND estatus = 'en proceso'"),
+            conteoPorDia('fecha_programada', 'maintenance', " AND estatus = 'completado'"),
+            conteoPorDia('fecha_programada', 'maintenance', " AND estatus = 'cancelado'"),
+        ]);
+
+        const serie = (mapa) => claves.map((clave) => mapa.get(clave) || 0);
+        res.json({
+            semana: { inicio, fin },
+            etiquetas: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+            dias: claves,
+            series: {
+                tickets: {
+                    creados: serie(ticketsCreados),
+                    tomados: serie(ticketsTomados),
+                    resueltos: serie(ticketsResueltos),
+                    cerrados: serie(ticketsCerrados),
+                },
+                mantenimientos: {
+                    pendiente: serie(mantPendientes),
+                    enProceso: serie(mantEnProceso),
+                    completado: serie(mantCompletados),
+                    cancelado: serie(mantCancelados),
+                },
+                agentes: {
+                    detectados: serie(agentesDetectados),
+                    lecturas: serie(lecturasAgentes),
+                },
+            },
+        });
+    } catch (err) {
+        console.error('GET /api/dashboard/weekly:', err.message);
+        res.status(500).json({ error: 'Error al consultar el resumen semanal' });
     }
 });
 

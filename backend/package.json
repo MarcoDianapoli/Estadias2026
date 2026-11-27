@@ -10,7 +10,11 @@
         "migrate:tickets": "node src/migrate-tickets.js",
         "backup:normalizacion": "node src/backup-normalizacion.js",
         "migrate:normalizacion": "node src/migrate-normalizacion.js",
-        "check": "node --check src/server.js && node --check src/agent.js && node --check src/db.js && node --check src/normalizacion.js && node --check src/backup-normalizacion.js && node --check src/migrate-normalizacion.js && node --check src/modules/assets.js && node --check src/modules/auth.js && node --check src/modules/tickets.js && node --check src/modules/maintenance.js && node --check src/migrate-tickets.js"
+        "migrate:mantenimiento-anual": "node src/migrate-mantenimiento-anual.js",
+        "migrate:mantenimiento-limpio": "node src/limpiar-mantenimiento.js",
+        "db:regenerar": "node src/regenerar-datos-demo.js",
+        "demo:agentes": "node src/simular-agentes.js",
+        "check": "node --check src/server.js && node --check src/agent.js && node --check src/db.js && node --check src/normalizacion.js && node --check src/backup-normalizacion.js && node --check src/migrate-normalizacion.js && node --check src/migrate-mantenimiento-anual.js && node --check src/limpiar-mantenimiento.js && node --check src/regenerar-datos-demo.js && node --check src/simular-agentes.js && node --check src/modules/assets.js && node --check src/modules/auth.js && node --check src/modules/tickets.js && node --check src/modules/maintenance.js && node --check src/migrate-tickets.js"
     },
     "dependencies": {
         "cors": "^2.8.6",

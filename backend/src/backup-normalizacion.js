@@ -13,17 +13,17 @@ function escapar(valor) {
   return mysql.escape(valor);
 }
 
-async function crearRespaldo() {
+async function crearRespaldo(prefijo = 'antes-normalizacion') {
   const [tablas] = await pool.query(
     "SELECT TABLE_NAME AS nombre FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME",
   );
   const [db] = await pool.query('SELECT DATABASE() AS nombre');
   const nombreDb = db[0]?.nombre || 'monitoreo';
   const sello = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-  const archivo = path.join(BACKUP_DIR, `antes-normalizacion-${sello}.sql`);
+  const archivo = path.join(BACKUP_DIR, `${prefijo}-${sello}.sql`);
 
   const lineas = [
-    `-- Respaldo completo de ${nombreDb} antes de normalizar a minúsculas sin acentos.`,
+    `-- Respaldo completo de ${nombreDb} antes de ${prefijo === 'antes-normalizacion' ? 'normalizar a minúsculas sin acentos' : 'regenerar los datos de demostración'}.`,
     `-- Generado: ${new Date().toISOString()}`,
     'SET FOREIGN_KEY_CHECKS=0;',
     '',
