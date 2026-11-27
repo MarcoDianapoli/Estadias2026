@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { apiFetch, socketOptions } from '../api.js';
+import BuscadorFlotante from '../BuscadorFlotante.jsx';
 import { useAuth } from '../AuthContext.jsx';
 import useDialog from '../useDialog.js';
 import usePageMeta from '../usePageMeta.js';
 import {
-  codigo, etiqueta, normalizarCodigoSgl, PRIORIDADES,
+  codigo, etiqueta, normalizarCodigoSgl, normalizarEntrada,
+  ESTADOS_TICKET, PRIORIDADES,
 } from '../normalizacion.js';
 
 const USER_TABS = [
@@ -47,13 +49,15 @@ function mensajeError(err) {
   return err?.message || 'Ocurrió un error inesperado';
 }
 
+const ESTADOS = {
+  abierto: { badge: 'estado-abierto', item: 'estado-item-abierto' },
+  'en proceso': { badge: 'estado-proceso', item: 'estado-item-proceso' },
+  resuelto: { badge: 'estado-resuelto', item: 'estado-item-resuelto' },
+  cerrado: { badge: 'estado-cerrado', item: 'estado-item-cerrado' },
+};
+
 function EstadoBadge({ estado }) {
-  const clase = {
-    abierto: 'estado-abierto',
-    'en proceso': 'estado-proceso',
-    resuelto: 'estado-resuelto',
-    cerrado: 'estado-cerrado',
-  }[estado] || 'estado-abierto';
+  const clase = ESTADOS[estado]?.badge || 'estado-abierto';
   return <span className={`ticket-badge ${clase}`}>{etiqueta(estado)}</span>;
 }
 
@@ -169,8 +173,10 @@ export default function Tickets() {
   const tabs = esAdmin ? ADMIN_TABS : esTecnico ? TECH_TABS : USER_TABS;
 
   const [scope, setScope] = useState(tabs[0].scope);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroPrioridad, setFiltroPrioridad] = useState('');
   const [tickets, setTickets] = useState([]);
-  const [stats, setStats] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -206,20 +212,6 @@ export default function Tickets() {
     }
   }, [scope]);
 
-  const loadStats = useCallback(async () => {
-    if (!esStaff) {
-      setStats(null);
-      return;
-    }
-    try {
-      const res = await apiFetch('/api/tickets/stats');
-      const data = await res.json();
-      if (res.ok) setStats(data);
-    } catch {
-      // Las tarjetas son informativas; el listado ya muestra su propio error.
-    }
-  }, [esStaff]);
-
   const loadDetail = useCallback(async (id) => {
     if (!id) {
       setDetail(null);
@@ -249,8 +241,27 @@ export default function Tickets() {
     }
   }, []);
 
+  const filtrosActivos = Boolean(busqueda.trim() || filtroEstado || filtroPrioridad);
+  const filtrados = useMemo(() => {
+    const q = normalizarEntrada(busqueda);
+    return tickets.filter((ticket) => {
+      if (filtroEstado && normalizarEntrada(ticket.estado) !== filtroEstado) return false;
+      if (filtroPrioridad && normalizarEntrada(ticket.prioridad) !== filtroPrioridad) return false;
+      if (!q) return true;
+      return [
+        ticket.id, ticket.titulo, ticket.descripcion, ticket.codigo,
+        ticket.categoria, ticket.solicitante_nombre, ticket.tecnico_nombre,
+      ].some((campo) => normalizarEntrada(campo).includes(q));
+    });
+  }, [tickets, busqueda, filtroEstado, filtroPrioridad]);
+
+  const limpiarFiltros = () => {
+    setBusqueda('');
+    setFiltroEstado('');
+    setFiltroPrioridad('');
+  };
+
   useEffect(() => { loadTickets(); }, [loadTickets]);
-  useEffect(() => { loadStats(); }, [loadStats]);
   useEffect(() => { loadDetail(selectedId); }, [selectedId, loadDetail]);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
@@ -259,8 +270,15 @@ export default function Tickets() {
   }, [detail?.id, detail?.prioridad]);
 
   useEffect(() => {
-    if (!selectedId && tickets.length) setSelectedId(Number(tickets[0].id));
-  }, [tickets, selectedId]);
+    if (cargando) return;
+    if (!filtrados.length) {
+      if (selectedId !== null) setSelectedId(null);
+      return;
+    }
+    if (!filtrados.some((ticket) => Number(ticket.id) === Number(selectedId))) {
+      setSelectedId(Number(filtrados[0].id));
+    }
+  }, [filtrados, cargando, selectedId]);
 
   useEffect(() => {
     const onLine = () => setOnline(true);
@@ -278,7 +296,6 @@ export default function Tickets() {
     const socket = io(socketOptions());
     const refrescar = (payload) => {
       loadTickets();
-      loadStats();
       // El borrado llega por socket antes de que el state local deje de apuntar al ticket.
       if (payload?.accion === 'eliminado') return;
       const id = selectedIdRef.current;
@@ -291,7 +308,7 @@ export default function Tickets() {
       else loadTickets();
     });
     return () => socket.disconnect();
-  }, [online, loadTickets, loadStats, loadDetail]);
+  }, [online, loadTickets, loadDetail]);
 
   function seleccionarTab(nuevoScope) {
     if (nuevoScope === scope) return;
@@ -314,12 +331,11 @@ export default function Tickets() {
         setDetail(null);
         setMessages([]);
         setDetalleError('');
-        await Promise.all([loadTickets(), loadStats()]);
+        await loadTickets();
         ticketIgnoradoRef.current = null;
       } else {
         await Promise.all([
           loadTickets(),
-          loadStats(),
           selectedId ? loadDetail(selectedId) : Promise.resolve(),
         ]);
       }
@@ -394,38 +410,21 @@ export default function Tickets() {
 
   function alCrear(ticket) {
     setNuevoAbierto(false);
+    limpiarFiltros();
     const destino = user.rol === 'usuario' ? 'mios-pendientes' : esAdmin ? 'all' : 'generales';
     setScope(destino);
     setTickets((prev) => [ticket, ...prev.filter((t) => Number(t.id) !== Number(ticket.id))]);
     setSelectedId(Number(ticket.id));
-    loadStats();
   }
 
   const tabActiva = tabs.find((tab) => tab.scope === scope) || tabs[0];
 
   return (
-    <main className="app tickets-page">
-      <header className="header">
-        <div className="header-actions">
-          <button type="button" className="btn primary" onClick={() => setNuevoAbierto(true)}>
-            Nuevo ticket
-          </button>
-        </div>
-      </header>
-
+    <main className="app tickets-page con-busqueda">
       {!online && (
         <p className="alerts critical" role="status">
           Sin conexión con el servidor local. Los cambios se reanudan al volver la red.
         </p>
-      )}
-
-      {stats && (
-        <div className="cards ticket-stats" aria-label="Resumen de tickets">
-          <div className="card"><span>Generales</span><strong>{stats.generales}</strong><small>Pendientes sin tomar</small></div>
-          <div className="card"><span>Tomados</span><strong>{stats.tomados}</strong><small>En atención</small></div>
-          <div className="card"><span>Cerrados</span><strong>{stats.cerrados}</strong><small>Historial</small></div>
-          <div className="card"><span>Total</span><strong>{stats.total}</strong><small>Incidencias registradas</small></div>
-        </div>
       )}
 
       <div className="tickets-tabs" role="tablist" aria-label="Secciones de tickets">
@@ -455,11 +454,37 @@ export default function Tickets() {
         <section className="panel ticket-list-panel" aria-labelledby="lista-tickets-title">
           <div className="panel-title">
             <div>
-              <h2 id="lista-tickets-title">{tabActiva.label}</h2>
+              <h2 id="lista-tickets-title">
+                {tabActiva.label} ({filtrosActivos ? `${filtrados.length} de ${tickets.length}` : tickets.length})
+              </h2>
               <p className="hint">{tabActiva.hint}</p>
             </div>
             <button type="button" className="detail-btn" onClick={loadTickets} disabled={cargando}>
               Actualizar
+            </button>
+          </div>
+
+          <div className="filter-bar" role="group" aria-label="Filtros de tickets">
+            <label>
+              <span>Estatus</span>
+              <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+                <option value="">Todos</option>
+                {ESTADOS_TICKET.map((estado) => (
+                  <option key={estado} value={estado}>{etiqueta(estado)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Prioridad</span>
+              <select value={filtroPrioridad} onChange={(e) => setFiltroPrioridad(e.target.value)}>
+                <option value="">Todas</option>
+                {PRIORIDADES.map((prioridad) => (
+                  <option key={prioridad} value={prioridad}>{etiqueta(prioridad)}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="detail-btn" onClick={limpiarFiltros} disabled={!filtrosActivos}>
+              Limpiar filtros
             </button>
           </div>
 
@@ -482,13 +507,21 @@ export default function Tickets() {
                         : 'Registra un nuevo ticket para comenzar.'}
               </p>
             </div>
+          ) : filtrados.length === 0 ? (
+            <div className="ticket-empty">
+              <strong>No hay tickets que coincidan con los filtros</strong>
+              <p>Ajusta la búsqueda, el estatus o la prioridad para volver a ver los tickets de esta sección.</p>
+              <button type="button" className="detail-btn" onClick={limpiarFiltros}>
+                Limpiar filtros
+              </button>
+            </div>
           ) : (
             <ul className="ticket-list">
-              {tickets.map((ticket) => (
+              {filtrados.map((ticket) => (
                 <li key={ticket.id}>
                   <button
                     type="button"
-                    className={`ticket-item${Number(selectedId) === Number(ticket.id) ? ' active' : ''}`}
+                    className={`ticket-item ${ESTADOS[ticket.estado]?.item || 'estado-item-abierto'}${Number(selectedId) === Number(ticket.id) ? ' active' : ''}`}
                     onClick={() => setSelectedId(Number(ticket.id))}
                     aria-current={Number(selectedId) === Number(ticket.id) ? 'true' : undefined}
                   >
@@ -636,6 +669,26 @@ export default function Tickets() {
           )}
         </section>
       </div>
+
+      <BuscadorFlotante
+        value={busqueda}
+        onChange={setBusqueda}
+        placeholder="Título, código, categoría o persona"
+        conTicket
+      />
+
+      <button
+        type="button"
+        className="ticket-fab"
+        onClick={() => setNuevoAbierto(true)}
+        aria-label="Nuevo ticket"
+        title="Nuevo ticket"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        <span>Nuevo ticket</span>
+      </button>
 
       {nuevoAbierto && <NewTicketModal onClose={() => setNuevoAbierto(false)} onCreated={alCrear} />}
     </main>

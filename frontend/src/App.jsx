@@ -31,7 +31,7 @@ function AppShell() {
   if (loading) {
     return (
       <main className="auth-loading" role="status" aria-live="polite">
-        <div className="login-brand" aria-hidden="true">LM</div>
+        <img className="login-brand" src="/logo_app.png" alt="" width="46" height="46" />
         <p>Verificando sesión local…</p>
       </main>
     );

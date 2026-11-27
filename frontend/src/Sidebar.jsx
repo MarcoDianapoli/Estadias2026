@@ -136,7 +136,7 @@ export default function Sidebar({ expandido, onToggle, abiertoMovil, onCerrarMov
             title="Loganmex"
             onClick={onCerrarMovil}
           >
-            <span className="brand-mark" aria-hidden="true">LM</span>
+            <img className="brand-logo" src="/logo_app.png" alt="" width="36" height="36" />
             <span className="sidebar-label brand-label">
               <strong>Loganmex</strong>
               <small>Monitoreo e inventario</small>

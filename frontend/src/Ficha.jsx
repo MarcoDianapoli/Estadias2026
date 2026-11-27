@@ -12,6 +12,44 @@ import {
 } from './normalizacion.js';
 import usePageMeta from './usePageMeta';
 
+const CLASE_MANTENIMIENTO = {
+  pendiente: 'offline',
+  'en proceso': 'online',
+  completado: 'online',
+  cancelado: 'offline',
+  'sin mantenimiento': 'neutro',
+};
+
+function etiquetaMantenimiento(valor) {
+  if (valor === 'sin mantenimiento') return 'Sin mantenimiento';
+  return etiqueta(valor);
+}
+
+function fechaMantenimiento(valor) {
+  if (!valor) return '';
+  const fecha = new Date(String(valor).replace(' ', 'T'));
+  if (Number.isNaN(fecha.getTime())) return String(valor);
+  return fecha.toLocaleString('es-MX', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function detalleMantenimiento(info) {
+  if (!info || info.estatus === 'sin mantenimiento') {
+    return 'Sin visitas programadas para este equipo.';
+  }
+  const orden = info.activa || info.ultima;
+  if (!orden) return 'Sin visitas registradas.';
+
+  const cuando = fechaMantenimiento(orden.fecha_programada);
+  const tipo = etiqueta(orden.tipo) || 'Lógico';
+  const plan = orden.origen === 'anual'
+    ? ` · ronda ${orden.ronda}, semana ${orden.semana} (${orden.anio_plan})`
+    : '';
+  const prefijo = info.activa ? 'Orden activa' : 'Última orden';
+  return `${prefijo}: ${cuando} · ${tipo}${plan}`;
+}
+
 function Modelo({ fabrica, codigo }) {
   const obj = useMemo(
     () => fabrica({ colorway: 'gray-2025', codigo }),
@@ -58,6 +96,7 @@ export default function Ficha({ token: tokenProp }) {
   const token = tokenProp || params.get('ficha') || '';
   const [asset, setAsset] = useState(null);
   const [devices, setDevices] = useState([]);
+  const [mantenimiento, setMantenimiento] = useState(null);
   const [editing, setEditing] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -69,7 +108,7 @@ export default function Ficha({ token: tokenProp }) {
 
   usePageMeta(
     asset ? `Ficha ${codigo(asset.codigo)}` : 'Ficha del equipo',
-    'Datos, credenciales, QR y comentarios de un equipo del inventario Loganmex.',
+    'Datos, estatus de mantenimiento, credenciales, QR y comentarios de un equipo del inventario Loganmex.',
   );
   const cerrarEdicion = () => setEditing(false);
 
@@ -87,6 +126,7 @@ export default function Ficha({ token: tokenProp }) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'No se encontró el equipo');
         setAsset(data);
+        setMantenimiento(data.mantenimiento || null);
         if (devicesRes.ok) {
           const lista = await devicesRes.json();
           setDevices(Array.isArray(lista) ? lista : []);
@@ -198,9 +238,22 @@ export default function Ficha({ token: tokenProp }) {
         <div className="ficha-print" aria-hidden="true">
           <strong className="print-code">{codigo(asset.codigo)}</strong>
           <img src={`/api/assets/${asset.id}/qr`} alt={`QR de ${codigo(asset.codigo)}`} />
+          <p className="print-mantenimiento">
+            Mantenimiento: {etiquetaMantenimiento(mantenimiento?.estatus)}
+          </p>
         </div>
 
         <h2>{codigo(asset.codigo)} · {[etiqueta(asset.marca), etiqueta(asset.modelo)].filter(Boolean).join(' ') || etiqueta(asset.tipo)}</h2>
+
+        <section className="ficha-mantenimiento" aria-label="Estado del mantenimiento">
+          <div>
+            <span>Estatus de mantenimiento</span>
+            <strong className={`badge ${CLASE_MANTENIMIENTO[mantenimiento?.estatus] || 'neutro'}`}>
+              {etiquetaMantenimiento(mantenimiento?.estatus)}
+            </strong>
+          </div>
+          <p>{detalleMantenimiento(mantenimiento)}</p>
+        </section>
 
         <div className="ficha-body">
           <div className="detail-grid ficha-grid">

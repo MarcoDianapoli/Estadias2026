@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { apiFetch } from './api.js';
 import { useAuth } from './AuthContext.jsx';
@@ -73,116 +73,127 @@ export default function Configuracion() {
   return (
     <main className="app configuracion-page">
       <div className="config-layout">
-        <section id="cuenta" className="panel config-panel" aria-labelledby="config-cuenta-title">
-          <div className="panel-title">
-            <div>
-              <h2 id="config-cuenta-title">Mi cuenta</h2>
-              <p className="hint">Datos de la sesión activa.</p>
+        <div className="config-column">
+          <section id="cuenta" className="panel config-panel" aria-labelledby="config-cuenta-title">
+            <div className="panel-title">
+              <div>
+                <h2 id="config-cuenta-title">Mi cuenta</h2>
+                <p className="hint">Datos de la sesión activa.</p>
+              </div>
             </div>
-          </div>
-          <dl className="config-detalles">
-            <div><dt>Usuario</dt><dd>{etiqueta(user.nombre)}</dd></div>
-            <div><dt>Rol</dt><dd>{ROLES[user.rol] || etiqueta(user.rol)}</dd></div>
-          </dl>
-        </section>
+            <dl className="config-detalles">
+              <div><dt>Usuario</dt><dd>{etiqueta(user.nombre)}</dd></div>
+              <div><dt>Rol</dt><dd>{ROLES[user.rol] || etiqueta(user.rol)}</dd></div>
+            </dl>
+          </section>
 
-        <section id="seguridad" className="panel config-panel" aria-labelledby="config-seguridad-title">
-          <div className="panel-title">
-            <div>
-              <h2 id="config-seguridad-title">Seguridad</h2>
-              <p className="hint">Cambia tu PIN. Se guarda como hash scrypt, nunca en texto.</p>
+          <section id="seguridad" className="panel config-panel" aria-labelledby="config-seguridad-title">
+            <div className="panel-title">
+              <div>
+                <h2 id="config-seguridad-title">Seguridad</h2>
+                <p className="hint">Cambia tu PIN. Se guarda como hash scrypt, nunca en texto.</p>
+              </div>
             </div>
-          </div>
-          {error && <p className="form-error" role="alert">{error}</p>}
-          {aviso && <p className="form-ok" role="status">{aviso}</p>}
-          <form className="config-form" onSubmit={onSubmitPin}>
-            <label>
-              PIN actual
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="current-password"
-                value={pinActual}
-                onChange={(e) => setPinActual(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              PIN nuevo
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                minLength={4}
-                value={pinNuevo}
-                onChange={(e) => setPinNuevo(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Confirmar PIN nuevo
-              <input
-                type="password"
-                inputMode="numeric"
-                autoComplete="new-password"
-                minLength={4}
-                value={pinConfirmar}
-                onChange={(e) => setPinConfirmar(e.target.value)}
-                required
-              />
-            </label>
-            <button type="submit" className="btn primary" disabled={procesando}>
-              {procesando ? 'Actualizando…' : 'Actualizar PIN'}
+            {error && <p className="form-error" role="alert">{error}</p>}
+            {aviso && <p className="form-ok" role="status">{aviso}</p>}
+            <form className="config-form" onSubmit={onSubmitPin}>
+              <label>
+                PIN actual
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="current-password"
+                  value={pinActual}
+                  onChange={(e) => setPinActual(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                PIN nuevo
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  minLength={4}
+                  value={pinNuevo}
+                  onChange={(e) => setPinNuevo(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Confirmar PIN nuevo
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  minLength={4}
+                  value={pinConfirmar}
+                  onChange={(e) => setPinConfirmar(e.target.value)}
+                  required
+                />
+              </label>
+              <button type="submit" className="btn primary" disabled={procesando}>
+                {procesando ? 'Actualizando…' : 'Actualizar PIN'}
+              </button>
+            </form>
+          </section>
+        </div>
+
+        <div className="config-column">
+          <section id="notificaciones" className="panel config-panel" aria-labelledby="config-notificaciones-title">
+            <div className="panel-title">
+              <div>
+                <h2 id="config-notificaciones-title">Notificaciones</h2>
+                <p className="hint">Avisos en vivo de tickets y chat.</p>
+              </div>
+            </div>
+            <div className="config-toggle-row">
+              <div>
+                <strong>Sonido de avisos</strong>
+                <p className="hint">Reproduce un tono cuando llegan nuevos avisos.</p>
+              </div>
+              <button
+                type="button"
+                className="btn secondary config-toggle"
+                onClick={alternarNotificaciones}
+                aria-pressed={!silenciado}
+              >
+                {silenciado ? 'Activar sonido' : 'Silenciar sonido'}
+              </button>
+            </div>
+          </section>
+
+          <section id="sesion" className="panel config-panel" aria-labelledby="config-sesion-title">
+            <div className="panel-title">
+              <div>
+                <h2 id="config-sesion-title">Sesión</h2>
+                <p className="hint">Cierra la sesión local en este dispositivo.</p>
+              </div>
+            </div>
+            <button type="button" className="btn danger" onClick={salir}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="m16 17 5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              Cerrar sesión
             </button>
-          </form>
-        </section>
+          </section>
 
-        <section id="notificaciones" className="panel config-panel" aria-labelledby="config-notificaciones-title">
-          <div className="panel-title">
-            <div>
-              <h2 id="config-notificaciones-title">Notificaciones</h2>
-              <p className="hint">Avisos en vivo de tickets y chat.</p>
+          <section id="ayuda" className="panel config-panel" aria-labelledby="config-ayuda-title">
+            <div className="panel-title">
+              <div>
+                <h2 id="config-ayuda-title">Ayuda</h2>
+                <p className="hint">Uso básico de la consola local.</p>
+              </div>
             </div>
-          </div>
-          <div className="config-toggle-row">
-            <div>
-              <strong>Sonido de avisos</strong>
-              <p className="hint">Reproduce un tono cuando llegan nuevos avisos.</p>
-            </div>
-            <button
-              type="button"
-              className="btn secondary config-toggle"
-              onClick={alternarNotificaciones}
-              aria-pressed={!silenciado}
-            >
-              {silenciado ? 'Activar sonido' : 'Silenciar sonido'}
-            </button>
-          </div>
-        </section>
-
-        <section id="sesion" className="panel config-panel" aria-labelledby="config-sesion-title">
-          <div className="panel-title">
-            <div>
-              <h2 id="config-sesion-title">Sesión</h2>
-              <p className="hint">Cierra la sesión local en este dispositivo.</p>
-            </div>
-          </div>
-          <button type="button" className="btn secondary" onClick={salir}>Cerrar sesión</button>
-        </section>
-
-        <section id="ayuda" className="panel config-panel" aria-labelledby="config-ayuda-title">
-          <div className="panel-title">
-            <div>
-              <h2 id="config-ayuda-title">Ayuda</h2>
-              <p className="hint">Uso básico de la consola local.</p>
-            </div>
-          </div>
-          <ul className="config-ayuda">
-            <li>Entra con tu usuario y PIN; la sesión dura 12 horas en este dispositivo.</li>
-            <li>La campana de la barra superior muestra los avisos en vivo; puedes silenciarlos aquí o en el panel.</li>
-            <li>Los tickets, el inventario y el mantenimiento se actualizan solos mientras la app esté abierta.</li>
-          </ul>
-        </section>
+            <ul className="config-ayuda">
+              <li>Entra con tu usuario y PIN; la sesión dura 12 horas en este dispositivo.</li>
+              <li>La campana de la barra superior muestra los avisos en vivo; puedes silenciarlos aquí o en el panel.</li>
+              <li>Los tickets, el inventario y el mantenimiento se actualizan solos mientras la app esté abierta.</li>
+            </ul>
+          </section>
+        </div>
 
         {user.rol === 'admin' && (
           <div id="accesos" className="config-admin">

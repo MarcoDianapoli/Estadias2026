@@ -61,5 +61,8 @@ export function reproducirSonido(tipo) {
     tono(ctx, 700, t + 0.09, 0.12);
   } else if (tipo === 'chat') {
     tono(ctx, 880, t, 0.07);
+  } else if (tipo === 'estado') {
+    tono(ctx, 600, t, 0.10);
+    tono(ctx, 760, t + 0.09, 0.13);
   }
 }

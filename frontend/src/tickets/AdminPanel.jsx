@@ -8,10 +8,15 @@ const ROLES = [
   { value: 'admin', label: 'Administrador' },
 ];
 
+const USUARIOS_POR_PAGINA = 5;
+
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [nuevo, setNuevo] = useState({ nombre: '', pin: '', rol: 'usuario' });
   const [cambioPin, setCambioPin] = useState({ id: '', pin: '' });
+  const [busquedaPin, setBusquedaPin] = useState('');
+  const [mostrarUsuariosPin, setMostrarUsuariosPin] = useState(false);
+  const [pagina, setPagina] = useState(1);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -73,6 +78,8 @@ export default function AdminPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el PIN');
       setCambioPin({ id: '', pin: '' });
+      setBusquedaPin('');
+      setMostrarUsuariosPin(false);
       setAviso('PIN actualizado.');
     } catch (err) {
       setError(err.message);
@@ -118,6 +125,20 @@ export default function AdminPanel() {
       setError(err.message);
     }
   }
+
+  function seleccionarUsuarioPin(usuario) {
+    setCambioPin((prev) => ({ ...prev, id: usuario.id }));
+    setBusquedaPin(etiqueta(usuario.nombre));
+    setMostrarUsuariosPin(false);
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil(users.length / USUARIOS_POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const inicio = (paginaActual - 1) * USUARIOS_POR_PAGINA;
+  const usuariosPagina = users.slice(inicio, inicio + USUARIOS_POR_PAGINA);
+  const usuariosFiltradosPin = users.filter((usuario) =>
+    normalizarEntrada(etiqueta(usuario.nombre)).includes(normalizarEntrada(busquedaPin))
+  );
 
   return (
     <section className="panel admin-panel" aria-labelledby="admin-title">
@@ -167,14 +188,61 @@ export default function AdminPanel() {
 
         <form className="admin-form" onSubmit={onSubmitPin}>
           <h3>Cambiar PIN</h3>
-          <label>
-            Usuario
-            <select value={cambioPin.id} onChange={(e) => setCambioPin({ ...cambioPin, id: e.target.value })} required>
-              <option value="">Selecciona…</option>
-              {users.map((usuario) => (
-                <option key={usuario.id} value={usuario.id}>{etiqueta(usuario.nombre)}</option>
-              ))}
-            </select>
+          <label
+            className="admin-user-search"
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget)) setMostrarUsuariosPin(false);
+            }}
+          >
+            <span>Usuario</span>
+            <input
+              type="search"
+              value={busquedaPin}
+              placeholder="Escribe para buscar…"
+              onChange={(e) => {
+                setBusquedaPin(e.target.value);
+                setMostrarUsuariosPin(true);
+                setCambioPin((prev) => ({ ...prev, id: '' }));
+              }}
+              onFocus={() => setMostrarUsuariosPin(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setBusquedaPin('');
+                  setCambioPin((prev) => ({ ...prev, id: '' }));
+                  setMostrarUsuariosPin(false);
+                }
+                if (e.key === 'Enter' && usuariosFiltradosPin.length) {
+                  e.preventDefault();
+                  seleccionarUsuarioPin(usuariosFiltradosPin[0]);
+                }
+              }}
+              role="combobox"
+              aria-expanded={mostrarUsuariosPin}
+              aria-controls="admin-pin-usuarios"
+              aria-autocomplete="list"
+              required
+            />
+            {mostrarUsuariosPin && (
+              <ul className="admin-user-results" id="admin-pin-usuarios" role="listbox">
+                {usuariosFiltradosPin.length ? usuariosFiltradosPin.map((usuario) => (
+                  <li key={usuario.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={cambioPin.id === usuario.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => seleccionarUsuarioPin(usuario)}
+                    >
+                      <strong>{etiqueta(usuario.nombre)}</strong>
+                      <small>{ROLES.find((rol) => rol.value === usuario.rol)?.label || etiqueta(usuario.rol)}</small>
+                    </button>
+                  </li>
+                )) : (
+                  <li className="admin-user-empty">Sin coincidencias</li>
+                )}
+              </ul>
+            )}
           </label>
           <label>
             PIN nuevo
@@ -207,7 +275,7 @@ export default function AdminPanel() {
               </tr>
             </thead>
             <tbody>
-              {users.map((usuario) => (
+              {usuariosPagina.map((usuario) => (
                 <tr key={usuario.id}>
                   <td><strong>{etiqueta(usuario.nombre)}</strong></td>
                   <td>
@@ -233,6 +301,46 @@ export default function AdminPanel() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!cargando && users.length > 0 && (
+        <div className="pagination">
+          <span>
+            Mostrando {inicio + 1}–{Math.min(inicio + USUARIOS_POR_PAGINA, users.length)} de {users.length}
+          </span>
+          <div className="pagination-buttons">
+            <button
+              type="button"
+              className="page-btn"
+              onClick={() => setPagina((prev) => Math.max(1, prev - 1))}
+              disabled={paginaActual === 1}
+              aria-label="Página anterior"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalPaginas }, (_, index) => index + 1).map((numero) => (
+              <button
+                key={numero}
+                type="button"
+                className={`page-btn${numero === paginaActual ? ' active' : ''}`}
+                onClick={() => setPagina(numero)}
+                aria-current={numero === paginaActual ? 'page' : undefined}
+                aria-label={`Página ${numero}`}
+              >
+                {numero}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="page-btn"
+              onClick={() => setPagina((prev) => Math.min(totalPaginas, prev + 1))}
+              disabled={paginaActual === totalPaginas}
+              aria-label="Página siguiente"
+            >
+              ›
+            </button>
+          </div>
         </div>
       )}
     </section>

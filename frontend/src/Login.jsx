@@ -28,7 +28,7 @@ export default function Login() {
   return (
     <main className="login-page">
       <div className="login-card">
-        <div className="login-brand" aria-hidden="true">LM</div>
+        <img className="login-brand" src="/logo_app.png" alt="Loganmex" width="46" height="46" />
         <h1>Acceso local</h1>
         <p className="login-lead">
           Consola interna de Loganmex. Usa tu usuario y PIN para continuar.

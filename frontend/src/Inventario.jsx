@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import AssetFormModal from './AssetFormModal';
+import BuscadorFlotante from './BuscadorFlotante';
 import { apiFetch } from './api.js';
 import { familiasText } from './families';
 import {
@@ -175,6 +176,9 @@ export default function Inventario() {
   const [linkDeviceId, setLinkDeviceId] = useState('');
   const [pagina, setPagina] = useState(1);
   const [porPagina, setPorPagina] = useState(25);
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroVinculacion, setFiltroVinculacion] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -286,7 +290,7 @@ export default function Inventario() {
   };
 
   const exportar = () => {
-    const data = assets.map((a) => ({
+    const data = filtrados.map((a) => ({
       Código: codigo(a.codigo),
       Tipo: etiqueta(a.tipo),
       Familias: familiasText(a.familias),
@@ -353,25 +357,53 @@ export default function Inventario() {
     }
   };
 
-  const totalPaginas = Math.max(1, Math.ceil(assets.length / porPagina));
+  const tiposDisponibles = useMemo(() => Array.from(new Set(
+    assets.map((a) => normalizarEntrada(a.tipo)).filter(Boolean)
+  )).sort(), [assets]);
+
+  const filtrosActivos = Boolean(busqueda.trim() || filtroTipo || filtroVinculacion);
+  const filtrados = useMemo(() => {
+    const q = normalizarEntrada(busqueda);
+    return assets.filter((a) => {
+      if (filtroTipo && normalizarEntrada(a.tipo) !== filtroTipo) return false;
+      if (filtroVinculacion === 'vinculados' && !a.device_id) return false;
+      if (filtroVinculacion === 'sin-vincular' && a.device_id) return false;
+      if (!q) return true;
+      return [
+        a.codigo, a.tipo, a.responsable, a.ubicacion, a.ip_address,
+        a.hostname, a.device_id, a.device_hostname, a.marca, a.modelo,
+        a.numero_serie, a.vnc, a.correo, a.fichaPath, a.fichaUrl,
+      ].some((campo) => normalizarEntrada(campo).includes(q));
+    });
+  }, [assets, busqueda, filtroTipo, filtroVinculacion]);
+
+  useEffect(() => { setPagina(1); }, [busqueda, filtroTipo, filtroVinculacion]);
+
+  const limpiarFiltros = () => {
+    setBusqueda('');
+    setFiltroTipo('');
+    setFiltroVinculacion('');
+  };
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / porPagina));
   const paginaActual = Math.min(pagina, totalPaginas);
   const inicio = (paginaActual - 1) * porPagina;
-  const visibles = assets.slice(inicio, inicio + porPagina);
-  const fin = Math.min(inicio + porPagina, assets.length);
+  const visibles = filtrados.slice(inicio, inicio + porPagina);
+  const fin = Math.min(inicio + porPagina, filtrados.length);
   const cambiarPorPagina = (valor) => {
     setPorPagina(valor);
     setPagina(1);
   };
 
   return (
-    <main className="app">
+    <main className="app con-busqueda">
       <header className="header">
         <div className="header-actions">
           <label className="btn secondary">
             {importing ? 'Importando…' : 'Importar Excel'}
             <input type="file" accept=".xlsx,.xls,.csv" hidden onChange={importar} disabled={importing} />
           </label>
-          <button className="btn secondary" onClick={exportar} disabled={!assets.length}>Exportar Excel</button>
+          <button className="btn secondary" onClick={exportar} disabled={!filtrados.length}>Exportar Excel</button>
           <button className="btn primary" onClick={abrirNuevo}>+ Registrar equipo</button>
         </div>
       </header>
@@ -395,13 +427,42 @@ export default function Inventario() {
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Equipos registrados ({assets.length})</h2>
-          <span className="hint">Las contraseñas se guardan cifradas en MySQL y se muestran aquí para su edición</span>
+          <h2>
+            Equipos registrados ({filtrosActivos ? `${filtrados.length} de ${assets.length}` : assets.length})
+          </h2>
+          <span className="hint">
+            {filtrosActivos
+              ? 'La exportación y la paginación usan los resultados filtrados'
+              : 'Las contraseñas se guardan cifradas en MySQL y se muestran aquí para su edición'}
+          </span>
+        </div>
+
+        <div className="filter-bar" role="group" aria-label="Filtros de inventario">
+          <label>
+            <span>Tipo</span>
+            <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
+              <option value="">Todos</option>
+              {tiposDisponibles.map((tipo) => (
+                <option key={tipo} value={tipo}>{etiqueta(tipo)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Vinculación</span>
+            <select value={filtroVinculacion} onChange={(e) => setFiltroVinculacion(e.target.value)}>
+              <option value="">Todas</option>
+              <option value="vinculados">Con agente</option>
+              <option value="sin-vincular">Sin agente</option>
+            </select>
+          </label>
+          <button type="button" className="detail-btn" onClick={limpiarFiltros} disabled={!filtrosActivos}>
+            Limpiar filtros
+          </button>
         </div>
 
         <Paginacion
           arriba
-          total={assets.length}
+          total={filtrados.length}
           paginaActual={paginaActual}
           porPagina={porPagina}
           inicio={inicio}
@@ -427,7 +488,16 @@ export default function Inventario() {
               {!cargando && !visibles.length && (
                 <tr>
                   <td colSpan="10" className="empty">
-                    No hay equipos registrados. Usa «Registrar equipo» o «Importar Excel».
+                    {filtrosActivos ? (
+                      <>
+                        No hay equipos que coincidan con los filtros.{' '}
+                        <button type="button" className="detail-btn" onClick={limpiarFiltros}>
+                          Limpiar filtros
+                        </button>
+                      </>
+                    ) : (
+                      'No hay equipos registrados. Usa «Registrar equipo» o «Importar Excel».'
+                    )}
                   </td>
                 </tr>
               )}
@@ -468,7 +538,7 @@ export default function Inventario() {
         </div>
 
         <Paginacion
-          total={assets.length}
+          total={filtrados.length}
           paginaActual={paginaActual}
           porPagina={porPagina}
           inicio={inicio}
@@ -478,6 +548,12 @@ export default function Inventario() {
           onPorPagina={cambiarPorPagina}
         />
       </section>
+
+      <BuscadorFlotante
+        value={busqueda}
+        onChange={setBusqueda}
+        placeholder="Código, usuario, IP, hostname o agente"
+      />
 
       {formInitial && (
         <AssetFormModal

@@ -144,6 +144,25 @@ export default function NotificationBell() {
           fecha: fechaISO(),
         }, 'tomado');
       }
+
+      if (payload.accion === 'estado' && payload.solicitante_usuario_id === user.id) {
+        const TITULOS_ESTADO = {
+          abierto: 'Tu ticket volvió a abrir',
+          'en proceso': 'Tu ticket está en proceso',
+          resuelto: 'Tu ticket fue resuelto',
+          cerrado: 'Tu ticket fue cerrado',
+        };
+        push({
+          key: `estado-${payload.ticketId}-${payload.estado}-${Date.now()}`,
+          level: payload.estado === 'resuelto' || payload.estado === 'cerrado' ? 'success' : 'info',
+          title: TITULOS_ESTADO[payload.estado] || 'Tu ticket cambió de estado',
+          text: `${cortar(titulo)} · Ahora: ${etiqueta(payload.estado || 'estado actualizado')}`,
+          to: '/tickets',
+          action: 'Ver ticket',
+          time: momento,
+          fecha: fechaISO(),
+        }, 'estado');
+      }
     });
 
     socket.on('tickets:message', (payload) => {

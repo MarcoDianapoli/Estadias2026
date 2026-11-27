@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { apiFetch } from './api.js';
 import { useAuth } from './AuthContext.jsx';
 import useDialog from './useDialog.js';
@@ -11,7 +11,9 @@ import {
 const ESTATUS = ESTADOS_MANTENIMIENTO;
 const TIPOS = TIPOS_MANTENIMIENTO;
 const META_SEMANAL = [10, 12];
-const VISITAS_POR_ANIO = 3;
+const RONDAS_POR_ANIO = 3;
+const ANIO_ACTUAL = new Date().getFullYear();
+const ANIOS = Array.from({ length: 5 }, (_, indice) => ANIO_ACTUAL - 2 + indice);
 const CLASE_ESTATUS = {
   pendiente: 'offline',
   'en proceso': 'online',
@@ -51,6 +53,40 @@ function mensajeError(err) {
   return err?.message || 'Ocurrió un error inesperado';
 }
 
+// Lunes de la semana de la fecha recibida, como clave YYYY-MM-DD en hora local.
+function claveSemana(valor) {
+  let fecha;
+  if (valor instanceof Date) {
+    fecha = new Date(valor.getFullYear(), valor.getMonth(), valor.getDate());
+  } else {
+    const match = String(valor || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return '';
+    fecha = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+  if (Number.isNaN(fecha.getTime())) return '';
+  fecha.setDate(fecha.getDate() - ((fecha.getDay() + 6) % 7));
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+}
+
+function numeroSemana(clave) {
+  const [anio, mes, dia] = clave.split('-').map(Number);
+  const lunes = new Date(anio, mes - 1, dia);
+  const jueves = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 3);
+  const anioIso = jueves.getFullYear();
+  const inicio = new Date(anioIso, 0, 4);
+  inicio.setDate(inicio.getDate() - ((inicio.getDay() + 6) % 7));
+  const diaUtc = (d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  return 1 + Math.round((diaUtc(jueves) - diaUtc(inicio)) / 604800000);
+}
+
+function rangoSemana(clave) {
+  const [anio, mes, dia] = clave.split('-').map(Number);
+  const lunes = new Date(anio, mes - 1, dia);
+  const domingo = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 6);
+  const corto = (d) => d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  return `${corto(lunes)} – ${corto(domingo)} ${domingo.getFullYear()}`;
+}
+
 function EstadoBadge({ estatus }) {
   return (
     <span className={`badge ${CLASE_ESTATUS[estatus] || 'offline'}`}>
@@ -64,6 +100,126 @@ function TipoBadge({ tipo }) {
     <span className={`badge ${tipo === 'fisico' ? 'fisico' : 'logico'}`}>
       {etiqueta(tipo) || 'Lógico'}
     </span>
+  );
+}
+
+function PlanBadge({ origen: origenFila, anio: anioPlan, ronda, semana: semanaPlan }) {
+  if (origenFila !== 'anual') return <span>—</span>;
+  return (
+    <span>
+      <strong className="code-badge">Anual {anioPlan}</strong>
+      <small>Ronda {ronda} · Semana {semanaPlan}</small>
+    </span>
+  );
+}
+
+function PlanAnualModal({ esAdmin, guardando, onClose, onGenerar }) {
+  const [form, setForm] = useState({
+    anio: String(ANIO_ACTUAL),
+    porSemana: '10',
+    rondas: String(RONDAS_POR_ANIO),
+    reemplazar: false,
+  });
+  const [error, setError] = useState('');
+  const dialogRef = useDialog(() => { if (!guardando) onClose(); });
+  const titleId = useId();
+
+  const change = (event) => {
+    const { name, type, checked, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    try {
+      await onGenerar({
+        anio: Number(form.anio),
+        porSemana: Number(form.porSemana),
+        rondas: Number(form.rondas),
+        reemplazar: esAdmin && form.reemplazar,
+      });
+    } catch (err) {
+      setError(mensajeError(err));
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !guardando) onClose(); }}>
+      <div
+        ref={dialogRef}
+        className="modal modal-form"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar" disabled={guardando}>×</button>
+        <h3 id={titleId}>Generar plan anual de mantenimiento</h3>
+        <p className="modal-sub">
+          Se toman los equipos del inventario, se reparten en rondas y se programan de lunes a viernes.
+          Las rondas alternan limpieza lógica y física. Si ya existe un plan para el año, no se duplica.
+        </p>
+
+        <form className="asset-form" onSubmit={submit}>
+          <label>
+            Año
+            <input
+              autoFocus
+              type="number"
+              name="anio"
+              value={form.anio}
+              onChange={change}
+              min={ANIO_ACTUAL - 1}
+              max={ANIO_ACTUAL + 5}
+              required
+            />
+          </label>
+          <label>
+            Equipos por semana
+            <input
+              type="number"
+              name="porSemana"
+              value={form.porSemana}
+              onChange={change}
+              min="1"
+              max="20"
+              required
+            />
+          </label>
+          <label>
+            Rondas al año
+            <input
+              type="number"
+              name="rondas"
+              value={form.rondas}
+              onChange={change}
+              min="1"
+              max="6"
+              required
+            />
+          </label>
+          <label className="full">
+            <input
+              type="checkbox"
+              name="reemplazar"
+              checked={form.reemplazar}
+              onChange={change}
+              disabled={!esAdmin}
+            />
+            {' '}Reemplazar el plan existente de ese año (solo administrador)
+          </label>
+
+          {error && <p className="form-error full" role="alert">{error}</p>}
+
+          <div className="modal-actions full">
+            <button type="button" className="btn secondary" onClick={onClose} disabled={guardando}>Cancelar</button>
+            <button type="submit" className="btn primary" disabled={guardando}>
+              {guardando ? 'Generando…' : 'Generar plan'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -162,13 +318,13 @@ function OrdenModal({ orden, guardando, setGuardando, onClose, onSaved }) {
             />
           </label>
           <label>
-            Responsable
+            Técnico que realizó el mantenimiento
             <input
               name="responsable"
               value={form.responsable}
               onChange={change}
               maxLength={128}
-              placeholder="Nombre del responsable"
+              placeholder="Nombre del técnico"
             />
           </label>
           <label>
@@ -207,10 +363,12 @@ export default function Mantenimiento() {
   const { user } = useAuth();
   const esAdmin = user?.rol === 'admin';
 
-  const [semana, setSemana] = useState('todos');
+  const semanaActual = claveSemana(new Date());
+  const [semanaSeleccionada, setSemanaSeleccionada] = useState(semanaActual);
+  const [origen, setOrigen] = useState('');
+  const [anio, setAnio] = useState('');
   const [estatus, setEstatus] = useState('');
   const [tipo, setTipo] = useState('');
-  const [equiposSemana, setEquiposSemana] = useState(0);
   const [mantenimientos, setMantenimientos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -219,25 +377,17 @@ export default function Mantenimiento() {
   const [accionError, setAccionError] = useState('');
   const [notice, setNotice] = useState('');
   const [formAbierta, setFormAbierta] = useState(null);
+  const [planAbierto, setPlanAbierto] = useState(false);
 
-  const loadMeta = useCallback(async () => {
-    try {
-      const res = await apiFetch('/api/maintenance?semana=actual');
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'No se pudo cargar la meta semanal');
-      const items = Array.isArray(data.mantenimientos) ? data.mantenimientos : [];
-      const codigos = new Set(items.map((item) => item.codigo).filter(Boolean));
-      setEquiposSemana(codigos.size);
-    } catch {
-      setEquiposSemana(0);
-    }
-  }, []);
+  const load = useCallback(async (filtros = {}) => {
+    const origenFiltro = filtros.origen ?? origen;
+    const anioFiltro = filtros.anio ?? anio;
 
-  const load = useCallback(async () => {
     setCargando(true);
     setError('');
     const parametros = new URLSearchParams();
-    if (semana === 'actual') parametros.set('semana', 'actual');
+    if (origenFiltro) parametros.set('origen', origenFiltro);
+    if (anioFiltro) parametros.set('anio', anioFiltro);
     if (estatus) parametros.set('estatus', estatus);
     if (tipo) parametros.set('tipo', tipo);
     const query = parametros.toString();
@@ -247,16 +397,45 @@ export default function Mantenimiento() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudieron cargar los mantenimientos');
       setMantenimientos(Array.isArray(data.mantenimientos) ? data.mantenimientos : []);
-      await loadMeta();
     } catch (err) {
       setError(mensajeError(err));
       setMantenimientos([]);
     } finally {
       setCargando(false);
     }
-  }, [semana, estatus, tipo, loadMeta]);
+  }, [origen, anio, estatus, tipo]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function generarPlan(datos) {
+    setAccionError('');
+    setGuardando(true);
+    try {
+      const res = await apiFetch('/api/maintenance/generar-anual', {
+        method: 'POST',
+        body: JSON.stringify(datos),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'No se pudo generar el plan anual');
+
+      setNotice(data.omitido
+        ? data.mensaje
+        : `${data.mensaje} ${(data.detalle || []).map((item) => `R${item.ronda}: semanas ${item.semanaInicio}–${item.semanaFin}`).join(' · ')}`);
+      setPlanAbierto(false);
+
+      if (!data.omitido) {
+        setOrigen('anual');
+        setAnio(String(data.anio));
+        setSemanaSeleccionada(semanaActual);
+        await load({ origen: 'anual', anio: String(data.anio) });
+      }
+    } catch (err) {
+      setAccionError(mensajeError(err));
+      throw err;
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   const alGuardar = (data, esEdicion) => {
     const etiquetaOrden = codigo(data.codigo) || data.actividad;
@@ -272,10 +451,14 @@ export default function Mantenimiento() {
     if (normalizarEntrada(nuevoEstatus) === normalizarEntrada(orden.estatus)) return;
     setAccionError('');
     setProcesandoId(orden.id);
+    const tecnico = normalizarEntrada(user?.nombre || '');
+    const cambios = normalizarEntrada(nuevoEstatus) === 'completado' && tecnico
+      ? { estatus: nuevoEstatus, responsable: tecnico }
+      : { estatus: nuevoEstatus };
     try {
       const res = await apiFetch(`/api/maintenance/${orden.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ estatus: nuevoEstatus }),
+        body: JSON.stringify(cambios),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudo cambiar el estatus');
@@ -297,7 +480,6 @@ export default function Mantenimiento() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudo eliminar la orden');
       setMantenimientos((prev) => prev.filter((item) => item.id !== orden.id));
-      await loadMeta();
       setNotice('Orden de mantenimiento eliminada');
     } catch (err) {
       setAccionError(mensajeError(err));
@@ -306,11 +488,75 @@ export default function Mantenimiento() {
     }
   }
 
+  const semanas = useMemo(() => {
+    const claves = new Set();
+    mantenimientos.forEach((orden) => {
+      const clave = claveSemana(orden.fecha_programada);
+      if (clave) claves.add(clave);
+    });
+    claves.add(semanaActual);
+    return Array.from(claves).sort();
+  }, [mantenimientos, semanaActual]);
+
+  const semanaActiva = semanas.includes(semanaSeleccionada) ? semanaSeleccionada : semanaActual;
+  const indiceSemana = Math.max(0, semanas.indexOf(semanaActiva));
+  const ordenesSemana = mantenimientos.filter(
+    (orden) => claveSemana(orden.fecha_programada) === semanaActiva,
+  );
+  const pendientesSemana = ordenesSemana.filter(
+    (orden) => normalizarEntrada(orden.estatus) === 'pendiente',
+  ).length;
+  const equiposSemana = new Set(ordenesSemana.map((orden) => orden.codigo).filter(Boolean)).size;
+  const inicioVentana = Math.max(0, Math.min(indiceSemana - 2, semanas.length - 5));
+  const semanasVisibles = semanas.slice(inicioVentana, inicioVentana + 5);
+
+  const controlesSemanas = (
+    <div className="pagination-buttons">
+      <button
+        type="button"
+        className="page-btn"
+        onClick={() => setSemanaSeleccionada(semanas[indiceSemana - 1])}
+        disabled={indiceSemana === 0}
+        aria-label="Semana anterior"
+      >
+        ‹
+      </button>
+      {semanasVisibles.map((clave) => {
+        const numero = numeroSemana(clave);
+        const anioClave = clave.slice(0, 4);
+        return (
+          <button
+            key={clave}
+            type="button"
+            className={`page-btn${clave === semanaActiva ? ' active' : ''}`}
+            onClick={() => setSemanaSeleccionada(clave)}
+            aria-current={clave === semanaActiva ? 'page' : undefined}
+            aria-label={`Semana ${numero} de ${anioClave}`}
+          >
+            {numero}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        className="page-btn"
+        onClick={() => setSemanaSeleccionada(semanas[indiceSemana + 1])}
+        disabled={indiceSemana === semanas.length - 1}
+        aria-label="Semana siguiente"
+      >
+        ›
+      </button>
+    </div>
+  );
+
   return (
     <main className="app">
       <header className="header">
         <div className="header-actions">
-          <button className="btn secondary" onClick={load} disabled={cargando || guardando}>Actualizar</button>
+          <button className="btn secondary" onClick={() => load()} disabled={cargando || guardando}>Actualizar</button>
+          <button className="btn secondary" onClick={() => setPlanAbierto(true)} disabled={cargando || guardando}>
+            Generar plan anual
+          </button>
           <button className="btn primary" onClick={() => setFormAbierta({ orden: null })} disabled={guardando}>
             Nueva orden
           </button>
@@ -319,41 +565,46 @@ export default function Mantenimiento() {
 
       {error && (
         <p className="alerts critical" role="alert">
-          {error} <button type="button" className="detail-btn" onClick={load}>Reintentar</button>
+          {error} <button type="button" className="detail-btn" onClick={() => load()}>Reintentar</button>
         </p>
       )}
       {accionError && <p className="form-error" role="alert">{accionError}</p>}
       {notice && <p className="alerts ok" role="status">{notice}</p>}
 
-      <section className="cards maintenance-meta" aria-label="Meta de mantenimiento">
+      <section className="cards maintenance-meta" aria-label="Indicadores de la semana">
         <div className="card">
-          <span>Equipos esta semana</span>
+          <span>Equipos en la semana</span>
           <strong className={equiposSemana >= META_SEMANAL[0] && equiposSemana <= META_SEMANAL[1] ? 'green' : 'red'}>
             {equiposSemana}
           </strong>
           <small>Meta: {META_SEMANAL[0]}–{META_SEMANAL[1]} equipos</small>
         </div>
         <div className="card">
-          <span>Visitas por equipo</span>
-          <strong>{VISITAS_POR_ANIO}</strong>
-          <small>Por año</small>
-        </div>
-        <div className="card">
-          <span>Equipos por ronda</span>
-          <strong>~{META_SEMANAL[1] * VISITAS_POR_ANIO}</strong>
-          <small>{VISITAS_POR_ANIO} rondas al año</small>
+          <span>Pendientes</span>
+          <strong className={pendientesSemana ? 'red' : 'green'}>{pendientesSemana}</strong>
+          <small>Órdenes por realizar en la semana</small>
         </div>
       </section>
 
       <section className="panel">
         <div className="panel-title">
-          <h2>Órdenes de trabajo ({mantenimientos.length})</h2>
+          <h2>Órdenes de trabajo ({ordenesSemana.length})</h2>
           <div className="header-actions">
             <label>
-              Periodo
-              <select value={semana} onChange={(e) => setSemana(e.target.value)}>
-                <option value="todos">Todos</option>
-                <option value="actual">Semana actual</option>
+              Origen
+              <select value={origen} onChange={(e) => setOrigen(e.target.value)}>
+                <option value="">Todos</option>
+                <option value="manual">Manual</option>
+                <option value="anual">Plan anual</option>
+              </select>
+            </label>
+            <label>
+              Año
+              <select value={anio} onChange={(e) => setAnio(e.target.value)}>
+                <option value="">Todos</option>
+                {ANIOS.map((anioOption) => (
+                  <option key={anioOption} value={anioOption}>{anioOption}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -377,6 +628,21 @@ export default function Mantenimiento() {
           </div>
         </div>
 
+        <div className="pagination pagination-top">
+          <span>
+            Semana {numeroSemana(semanaActiva)} de {semanaActiva.slice(0, 4)} · {rangoSemana(semanaActiva)} · {ordenesSemana.length} órdenes
+            {semanaActiva !== semanaActual && (
+              <>
+                {' · '}
+                <button type="button" className="detail-btn" onClick={() => setSemanaSeleccionada(semanaActual)}>
+                  Ir a la semana actual
+                </button>
+              </>
+            )}
+          </span>
+          {controlesSemanas}
+        </div>
+
         <div className="table-wrap">
           <table>
             <thead>
@@ -386,23 +652,25 @@ export default function Mantenimiento() {
                 <th>Tipo</th>
                 <th>Fecha programada</th>
                 <th>Estatus</th>
-                <th>Responsable</th>
+                <th>Plan</th>
+                <th>Ronda / Semana</th>
+                <th>Técnico</th>
                 <th>Observaciones</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {cargando && (
-                <tr><td colSpan="8" className="empty" role="status">Cargando mantenimientos…</td></tr>
+                <tr><td colSpan="10" className="empty" role="status">Cargando mantenimientos…</td></tr>
               )}
-              {!cargando && !mantenimientos.length && (
+              {!cargando && !ordenesSemana.length && (
                 <tr>
-                  <td colSpan="8" className="empty">
-                    No hay órdenes de mantenimiento con estos filtros. Usa «Nueva orden» para registrar una.
+                  <td colSpan="10" className="empty">
+                    No hay órdenes en esta semana con estos filtros. Cambia de semana con las flechas o usa «Nueva orden».
                   </td>
                 </tr>
               )}
-              {!cargando && mantenimientos.map((orden) => (
+              {!cargando && ordenesSemana.map((orden) => (
                 <tr key={orden.id}>
                   <td><strong className="code-badge">{codigo(orden.codigo) || '—'}</strong></td>
                   <td>
@@ -422,6 +690,15 @@ export default function Mantenimiento() {
                         <option key={estatusOption} value={estatusOption}>{etiqueta(estatusOption)}</option>
                       ))}
                     </select>
+                  </td>
+                  <td>{orden.origen === 'anual' ? 'Anual' : 'Manual'}</td>
+                  <td>
+                    <PlanBadge
+                      origen={orden.origen}
+                      anio={orden.anio_plan}
+                      ronda={orden.ronda}
+                      semana={orden.semana}
+                    />
                   </td>
                   <td>{etiqueta(orden.responsable) || '—'}</td>
                   <td>{orden.observaciones || '—'}</td>
@@ -452,6 +729,11 @@ export default function Mantenimiento() {
             </tbody>
           </table>
         </div>
+
+        <div className="pagination">
+          <span>Página {indiceSemana + 1} de {semanas.length} semanas</span>
+          {controlesSemanas}
+        </div>
       </section>
 
       {formAbierta && (
@@ -462,6 +744,15 @@ export default function Mantenimiento() {
           setGuardando={setGuardando}
           onClose={() => setFormAbierta(null)}
           onSaved={alGuardar}
+        />
+      )}
+
+      {planAbierto && (
+        <PlanAnualModal
+          esAdmin={esAdmin}
+          guardando={guardando}
+          onClose={() => setPlanAbierto(false)}
+          onGenerar={generarPlan}
         />
       )}
     </main>
